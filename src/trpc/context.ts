@@ -1,4 +1,5 @@
 import * as trpcExpress from '@trpc/server/adapters/express';
+import { prisma } from '../db'; // Import Prisma client
 
 // Created for each request
 export const createContext = ({ req, res }: trpcExpress.CreateExpressContextOptions) => {
@@ -8,6 +9,7 @@ export const createContext = ({ req, res }: trpcExpress.CreateExpressContextOpti
     // user,
     req,
     res,
+    prisma, // Add prisma to the context
   };
 };
 

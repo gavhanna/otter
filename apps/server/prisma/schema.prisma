@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../../data/otter.db" // Adjusted path to root /data directory
+}
+
+model User {
+  id        String    @id @default(cuid())
+  username  String    @unique
+  password  String // Hashed password
+  isAdmin   Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  recordings Recording[]
+}
+
+model Recording {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  title       String?
+  filename    String // e.g., UUID.webm
+  filePath    String // Full path or relative path from a base audio directory
+  mimeType    String?   // e.g., "audio/webm;codecs=opus"
+  durationMs  Int?      // Duration in milliseconds
+  status      String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  transcript  Transcript?
+}
+
+model Transcript {
+  id          String    @id @default(cuid())
+  recordingId String    @unique // One-to-one with Recording
+  recording   Recording @relation(fields: [recordingId], references: [id])
+  text        String?
+  language    String?   // Detected language
+  processedAt DateTime? // When transcription was completed
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
