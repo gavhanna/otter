@@ -1,9 +1,28 @@
 {
-  "main": "dist/server.js",
+  "name": "otter-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Otter - Self-hosted audio recording and transcription service",
   "scripts": {
-    "build": "tsc",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "start": "node dist/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:web": "pnpm --filter web dev",
+    "dev:server": "pnpm --filter server dev",
+    "build:web": "pnpm --filter web build",
+    "build:server": "pnpm --filter server build",
+    "dev": "pnpm run dev:web & pnpm run dev:server",
+    "lint": "echo \"Linting not yet configured\"",
+    "typecheck": "echo \"Typechecking not yet configured\""
+  },
+  "keywords": [
+    "audio",
+    "recorder",
+    "transcription",
+    "self-hosted",
+    "trpc",
+    "react"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.8.3"
   }
-} 
+}
