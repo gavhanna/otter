@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: otter_server
+    ports:
+      - "${PORT:-3001}:${PORT:-3001}"
+    volumes:
+      - ./data:/app/data # Mount local data dir to container's data dir for DB and audio files
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "file:/app/data/otter.db"
+    restart: unless-stopped
+
+  # Add web service here later if you want to Dockerize it for production
+  # web:
+  #   build:
+  #     context: .
+  #     dockerfile: apps/web/Dockerfile
+  #   ports:
+  #     - "80:80"
