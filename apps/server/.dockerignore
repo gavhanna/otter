@@ -1,7 +1,0 @@
-node_modules
-dist
-.env
-*.log
-
-# Optional: If you have local test data or large files not needed in image
-# test_data/ 
