@@ -73,6 +73,10 @@ export const api = {
     request<{ recording: RecordingSummary }>(`api/recordings/${id}/favourite`, {
       method: 'PATCH',
       json: { isFavourited }
+    }),
+  deleteRecording: (id: string) =>
+    request<{ message: string }>(`api/recordings/${id}`, {
+      method: 'DELETE'
     })
 };
 

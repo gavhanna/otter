@@ -5,6 +5,7 @@ import { type FastifyInstance } from "fastify";
 import type { MultipartFile } from "@fastify/multipart";
 import {
     createRecordingWithFile,
+    deleteRecording,
     getRecordingForViewer,
     getPrimaryAssetForViewer,
     listRecordings,
@@ -284,6 +285,49 @@ export async function registerRecordingRoutes(
                 return reply
                     .status(500)
                     .send({ message: "Unable to stream recording" });
+            }
+        }
+    );
+
+    app.delete(
+        "/recordings/:id",
+        {
+            preHandler: app.authenticate,
+        },
+        async (request, reply) => {
+            if (!request.authUser) {
+                return reply
+                    .status(401)
+                    .send({ message: "Authentication required" });
+            }
+
+            const { id } = request.params as { id: string };
+            if (!id) {
+                return reply
+                    .status(400)
+                    .send({ message: "Recording id is required" });
+            }
+
+            try {
+                const deleted = await deleteRecording(
+                    app.db,
+                    request.authUser,
+                    id,
+                    app.config.storageDir
+                );
+
+                if (!deleted) {
+                    return reply
+                        .status(404)
+                        .send({ message: "Recording not found" });
+                }
+
+                return reply.status(200).send({ message: "Recording deleted successfully" });
+            } catch (error) {
+                request.log.error(error, "Failed to delete recording");
+                return reply
+                    .status(500)
+                    .send({ message: "Unable to delete recording" });
             }
         }
     );

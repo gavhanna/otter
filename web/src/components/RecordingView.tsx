@@ -5,13 +5,16 @@ import { api } from '../lib/api';
 
 interface RecordingViewProps {
   recordingId: string | null;
+  onRecordingDeleted?: () => void;
 }
 
-export function RecordingView({ recordingId }: RecordingViewProps) {
+export function RecordingView({ recordingId, onRecordingDeleted }: RecordingViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isWaveformReady, setIsWaveformReady] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const queryClient = useQueryClient();
@@ -91,6 +94,48 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
           )
         };
       });
+    }
+  };
+
+  // Handle delete recording
+  const handleDeleteRecording = async () => {
+    if (!recording || !recordingId) {
+      console.error('Missing recording data:', { recording, recordingId });
+      return;
+    }
+
+    if (!recording.id) {
+      console.error('Recording ID is missing:', recording);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await api.deleteRecording(recording.id);
+
+      // Remove recording from cache
+      queryClient.removeQueries({ queryKey: ['recording', recordingId] });
+
+      // Update recordings list cache
+      queryClient.setQueryData(['recordings'], (oldData: any) => {
+        if (!oldData?.recordings) return oldData;
+        return {
+          ...oldData,
+          recordings: oldData.recordings.filter((r: any) => r.id !== recording.id)
+        };
+      });
+
+      // Invalidate queries to ensure UI components are updated
+      queryClient.invalidateQueries({ queryKey: ['recordings'] });
+
+      // Notify parent component
+      onRecordingDeleted?.();
+
+    } catch (error) {
+      console.error('Failed to delete recording:', error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -248,11 +293,15 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
               </svg>
               Share
             </button>
-            <button className="rounded-lg border border-rose-700 px-4 py-2 text-sm text-rose-400 hover:bg-rose-900/20 flex items-center gap-2">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={!recording?.id || isDeleting}
+              className="rounded-lg border border-rose-700 px-4 py-2 text-sm text-rose-400 hover:bg-rose-900/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
@@ -399,6 +448,58 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
           </section>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-xl p-6 max-w-md mx-4 border border-slate-700">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-rose-500/20 flex items-center justify-center">
+                <svg className="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Delete Recording</h3>
+                <p className="text-sm text-slate-400">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-slate-300 mb-6">
+              Are you sure you want to delete "<span className="font-medium text-white">{recording?.title}</span>"? This will permanently remove the recording and its audio file.
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteRecording}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm bg-rose-600 text-white hover:bg-rose-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Recording
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

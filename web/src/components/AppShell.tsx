@@ -48,6 +48,10 @@ export function AppShell({ children }: AppShellProps) {
     setRecordingMode(false); // Exit recording mode when selecting a recording
   };
 
+  const handleRecordingDeleted = () => {
+    setSelectedRecordingId(null); // Clear selection when recording is deleted
+  };
+
   return (
       <RecordingContext.Provider
           value={{ selectedRecordingId, setSelectedRecordingId, isRecordingMode, setRecordingMode }}
@@ -96,7 +100,7 @@ export function AppShell({ children }: AppShellProps) {
                               onRecordingComplete={handleRecordingComplete}
                           />
                       ) : selectedRecordingId ? (
-                          <RecordingView recordingId={selectedRecordingId} />
+                          <RecordingView recordingId={selectedRecordingId} onRecordingDeleted={handleRecordingDeleted} />
                       ) : (
                           <div className="flex-1 overflow-y-auto p-4 lg:p-8">
                               {children}

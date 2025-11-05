@@ -426,6 +426,54 @@ export async function updateRecordingFavourite(
     };
 }
 
+export async function deleteRecording(
+    db: BetterSQLite3Database,
+    viewer: PublicUser,
+    recordingId: string,
+    storageDir: string
+): Promise<boolean> {
+    // First verify access and get recording assets
+    const recording = await getRecordingForViewer(db, viewer, recordingId);
+    if (!recording) {
+        return false;
+    }
+
+    // Get all assets for this recording to delete from storage
+    const assets = await db
+        .select({
+            storagePath: recordingAssets.storagePath,
+        })
+        .from(recordingAssets)
+        .where(eq(recordingAssets.recordingId, recordingId));
+
+    try {
+        // Delete from database (this will cascade delete assets due to foreign key constraint)
+        const deleted = await db
+            .delete(recordings)
+            .where(eq(recordings.id, recordingId))
+            .run();
+
+        if (deleted.changes === 0) {
+            return false;
+        }
+
+        // Delete asset files from storage
+        for (const asset of assets) {
+            try {
+                await safeUnlink(join(storageDir, asset.storagePath));
+            } catch (error) {
+                // Log error but continue with deletion
+                console.warn(`Failed to delete asset file: ${asset.storagePath}`, error);
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Failed to delete recording:', error);
+        throw error;
+    }
+}
+
 function mapRowToSummary(row: RecordingRow): RecordingSummary {
     const owner =
         row.ownerId && row.ownerEmail
