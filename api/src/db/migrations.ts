@@ -51,6 +51,21 @@ export function runMigrations(sqlite: SQLiteDatabase): void {
   sqlite.exec('BEGIN');
   try {
     sqlite.exec(SCHEMA_SQL);
+
+    // Ensure is_favorited column exists and has proper values
+    try {
+      // Add the column if it doesn't exist
+      sqlite.exec('ALTER TABLE recordings ADD COLUMN is_favorited INTEGER NOT NULL DEFAULT 0');
+    } catch (error: any) {
+      // Column already exists, ignore error
+      if (!error.message.includes('duplicate column name')) {
+        throw error;
+      }
+    }
+
+    // Update any NULL values to 0
+    sqlite.prepare('UPDATE recordings SET is_favorited = 0 WHERE is_favorited IS NULL').run();
+
     sqlite
       .prepare(
         `INSERT OR IGNORE INTO settings (id, registration_enabled, created_at, updated_at)

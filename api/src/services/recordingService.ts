@@ -21,6 +21,7 @@ type RecordingRow = {
     ownerId: string | null;
     ownerEmail: string | null;
     ownerDisplayName: string | null;
+    isFavorited: boolean | null;
 };
 
 export type RecordingSummary = {
@@ -31,6 +32,7 @@ export type RecordingSummary = {
     recordedAt: string | null;
     createdAt: string;
     updatedAt: string;
+    isFavorited: boolean;
     owner: {
         id: string;
         email: string;
@@ -83,6 +85,7 @@ export async function listRecordings(
             recordedAt: recordings.recordedAt,
             createdAt: recordings.createdAt,
             updatedAt: recordings.updatedAt,
+            isFavorited: recordings.isFavorited,
             ownerId: recordings.ownerId,
             ownerEmail: users.email,
             ownerDisplayName: users.displayName,
@@ -172,6 +175,7 @@ export async function getRecordingForViewer(
             recordedAt: recordings.recordedAt,
             createdAt: recordings.createdAt,
             updatedAt: recordings.updatedAt,
+            isFavorited: recordings.isFavorited,
             ownerId: recordings.ownerId,
             ownerEmail: users.email,
             ownerDisplayName: users.displayName,
@@ -358,6 +362,70 @@ function inferExtension(mimetype?: string, filename?: string): string {
     return ".webm";
 }
 
+export async function updateRecordingFavorite(
+    db: BetterSQLite3Database,
+    viewer: PublicUser,
+    recordingId: string,
+    isFavorited: boolean
+): Promise<RecordingSummary | null> {
+    // First verify access
+    const recording = await getRecordingForViewer(db, viewer, recordingId);
+    if (!recording) {
+        return null;
+    }
+
+    // Update the favorite status
+    const [updated] = await db
+        .update(recordings)
+        .set({ isFavorited: isFavorited ? 1 : 0 })
+        .where(eq(recordings.id, recordingId))
+        .returning({
+            id: recordings.id,
+            title: recordings.title,
+            description: recordings.description,
+            durationMs: recordings.durationMs,
+            recordedAt: recordings.recordedAt,
+            createdAt: recordings.createdAt,
+            updatedAt: recordings.updatedAt,
+            isFavorited: recordings.isFavorited,
+            ownerId: recordings.ownerId,
+        });
+
+    if (!updated) {
+        return null;
+    }
+
+    // Get owner info for the response
+    const [rowWithOwner] = await db
+        .select({
+            ownerEmail: users.email,
+            ownerDisplayName: users.displayName,
+        })
+        .from(users)
+        .where(eq(users.id, updated.ownerId))
+        .limit(1);
+
+    const owner = rowWithOwner
+        ? {
+              id: updated.ownerId,
+              email: rowWithOwner.ownerEmail,
+              displayName: rowWithOwner.ownerDisplayName ?? null,
+          }
+        : null;
+
+    return {
+        id: updated.id,
+        title: updated.title,
+        description: updated.description ?? null,
+        durationMs: updated.durationMs ?? 0,
+        recordedAt: toIsoString(updated.recordedAt),
+        createdAt: toIsoString(updated.createdAt) ?? new Date().toISOString(),
+        updatedAt: toIsoString(updated.updatedAt) ?? new Date().toISOString(),
+        isFavorited: Boolean(updated.isFavorited),
+        owner,
+    };
+}
+
 function mapRowToSummary(row: RecordingRow): RecordingSummary {
     const owner =
         row.ownerId && row.ownerEmail
@@ -376,6 +444,7 @@ function mapRowToSummary(row: RecordingRow): RecordingSummary {
         recordedAt: toIsoString(row.recordedAt),
         createdAt: toIsoString(row.createdAt) ?? new Date().toISOString(),
         updatedAt: toIsoString(row.updatedAt) ?? new Date().toISOString(),
+        isFavorited: Boolean(row.isFavorited),
         owner,
     };
 }

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { api } from '../lib/api';
@@ -14,6 +14,7 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
   const [isWaveformReady, setIsWaveformReady] = useState(false);
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: recording, isLoading, error } = useQuery({
     queryKey: ['recording', recordingId],
@@ -25,11 +26,79 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
     enabled: !!recordingId
   });
 
-  const audioSrc = recording ? `/api/recordings/${recording.id}/stream` : null;
+  const audioSrc = recording && recordingId && recording.id ? `/api/recordings/${recording.id}/stream` : null;
 
-  // Initialize WaveSurfer when recording changes
+
+  // Handle favorite toggle
+  const handleToggleFavorite = async () => {
+    if (!recording || !recordingId) {
+      console.error('Missing recording data:', { recording, recordingId });
+      return;
+    }
+
+    if (!recording.id) {
+      console.error('Recording ID is missing:', recording);
+      return;
+    }
+
+    const newFavoriteStatus = !recording.isFavorited;
+
+    // Create a stable copy to avoid triggering WaveSurfer re-initialization
+    const originalRecording = { ...recording };
+
+    // Optimistic update - update UI immediately
+    queryClient.setQueryData(['recording', recordingId], (oldData: any) => {
+      if (!oldData?.recording) return oldData;
+      return {
+        ...oldData,
+        recording: { ...oldData.recording, isFavorited: newFavoriteStatus }
+      };
+    });
+
+    // Update the recording in the list cache
+    queryClient.setQueryData(['recordings'], (oldData: any) => {
+      if (!oldData?.recordings) return oldData;
+      return {
+        ...oldData,
+        recordings: oldData.recordings.map((r: any) =>
+          r.id === recording.id ? { ...r, isFavorited: newFavoriteStatus } : r
+        )
+      };
+    });
+
+    try {
+      await api.updateFavorite(recording.id, newFavoriteStatus);
+
+      // Invalidate queries to ensure both sidebar and recording view update
+      queryClient.invalidateQueries({ queryKey: ['recordings'] });
+      queryClient.invalidateQueries({ queryKey: ['recording', recordingId] });
+    } catch (error) {
+      console.error('Failed to update favorite status:', error);
+      // Revert on error
+      queryClient.setQueryData(['recording', recordingId], (oldData: any) => {
+        if (!oldData?.recording) return oldData;
+        return {
+          ...oldData,
+          recording: originalRecording
+        };
+      });
+      queryClient.setQueryData(['recordings'], (oldData: any) => {
+        if (!oldData?.recordings) return oldData;
+        return {
+          ...oldData,
+          recordings: oldData.recordings.map((r: any) =>
+            r.id === recording.id ? originalRecording : r
+          )
+        };
+      });
+    }
+  };
+
+  // Initialize WaveSurfer when recording changes (but not when only favorite status changes)
   useEffect(() => {
-    if (!audioSrc || !waveformRef.current) return;
+    if (!audioSrc || !waveformRef.current || !recordingId) {
+      return;
+    }
 
     // Destroy existing instance
     if (wavesurferRef.current) {
@@ -95,7 +164,7 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
       }
       setIsWaveformReady(false);
     };
-  }, [audioSrc, recordingId]);
+  }, [audioSrc, recordingId]); // Keep these dependencies but ensure audioSrc is stable
 
   if (!recordingId) {
     return (
@@ -151,11 +220,27 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-              Favorite
+            <button
+              onClick={handleToggleFavorite}
+              disabled={!recording?.id}
+              className={`rounded-lg border px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                !recording?.id
+                  ? 'border-slate-800 text-slate-500 cursor-not-allowed'
+                  : recording?.isFavorited
+                  ? 'border-brand bg-brand/20 text-brand hover:bg-brand/30'
+                  : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {recording?.isFavorited ? (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              )}
+              {recording?.isFavorited ? 'Favorited' : 'Favorite'}
             </button>
             <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
