@@ -23,13 +23,20 @@ Additional setup details live in `docs/PROJECT_PLAN.md`.
 
 ## First-Time Bootstrap
 1. Copy the sample environment file: `cp api/.env.example api/.env`.
-2. Start the API and run the bootstrap request once to create the first admin:
+2. Either set bootstrap environment variables **before starting the API**:
+   ```
+   BOOTSTRAP_ADMIN_EMAIL=you@example.com
+   BOOTSTRAP_ADMIN_PASSWORD=changeme123
+   BOOTSTRAP_ADMIN_NAME=Your Name
+   ```
+   The server will create this admin automatically the first time it starts (only if no users exist yet).
+3. Or run the bootstrap request manually after the server is running:
    ```bash
    curl -X POST http://localhost:4000/auth/bootstrap \
      -H "Content-Type: application/json" \
      -d '{"email":"you@example.com","password":"changeme123","displayName":"Your Name"}'
    ```
-3. You should receive a `201` response confirming the admin account. Subsequent attempts will return `409` to prevent duplicates.
+4. You should receive a `201` response confirming the admin account. Subsequent attempts will return `409` to prevent duplicates.
 
 ## Auth API (early testing helpers)
 - Login:

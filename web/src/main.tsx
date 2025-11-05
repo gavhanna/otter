@@ -11,6 +11,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import { AppShell } from './components/AppShell';
 import { RecordingsPage } from './pages/RecordingsPage';
+import { LoginPage } from './pages/LoginPage';
+import { AuthProvider } from './lib/authStore';
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -20,13 +22,19 @@ const rootRoute = createRootRoute({
   )
 });
 
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/login',
+  component: LoginPage
+});
+
 const recordingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: RecordingsPage
 });
 
-const routeTree = rootRoute.addChildren([recordingsRoute]);
+const routeTree = rootRoute.addChildren([loginRoute, recordingsRoute]);
 
 const router = createRouter({
   routeTree
@@ -43,7 +51,9 @@ const queryClient = new QueryClient();
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

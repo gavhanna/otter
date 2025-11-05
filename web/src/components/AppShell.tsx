@@ -1,11 +1,14 @@
 import { type ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
+import { useAuth } from '../lib/authStore';
 
 type AppShellProps = {
   children: ReactNode;
 };
 
 export function AppShell({ children }: AppShellProps) {
+  const { user, logout } = useAuth();
+
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       <aside className="hidden w-64 flex-col border-r border-slate-800 bg-slate-900 p-4 lg:flex">
@@ -43,7 +46,22 @@ export function AppShell({ children }: AppShellProps) {
             <button className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-slate-950 shadow">
               New Recording
             </button>
-            <div className="h-10 w-10 rounded-full bg-slate-800" aria-label="User avatar" />
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-white">
+                {user?.displayName?.slice(0, 1)?.toUpperCase() ?? 'U'}
+              </div>
+              <div className="hidden flex-col text-xs text-slate-400 sm:flex">
+                <span className="text-slate-200">{user?.displayName ?? user?.email ?? 'Unknown user'}</span>
+                <button
+                  className="text-left text-xs text-brand hover:underline"
+                  onClick={() => {
+                    void logout();
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
           </div>
         </header>
 

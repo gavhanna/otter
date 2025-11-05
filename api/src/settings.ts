@@ -13,6 +13,13 @@ export type AppConfig = {
   databasePath: string;
   storageDir: string;
   jwtSecret: string;
+  bootstrapAdmin: BootstrapAdminConfig | null;
+};
+
+export type BootstrapAdminConfig = {
+  email: string;
+  password: string;
+  displayName?: string;
 };
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -39,6 +46,22 @@ export function loadConfig(): AppConfig {
     logLevel: (process.env.LOG_LEVEL as AppConfig['logLevel']) ?? 'info',
     databasePath: process.env.DATABASE_PATH ?? './data/otter.sqlite',
     storageDir: process.env.STORAGE_DIR ?? './data/audio',
-    jwtSecret: process.env.JWT_SECRET ?? 'change-me-super-secret'
+    jwtSecret: process.env.JWT_SECRET ?? 'change-me-super-secret',
+    bootstrapAdmin: readBootstrapAdmin()
+  };
+}
+
+function readBootstrapAdmin(): BootstrapAdminConfig | null {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim();
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+
+  if (!email || !password) {
+    return null;
+  }
+
+  return {
+    email,
+    password,
+    displayName: process.env.BOOTSTRAP_ADMIN_NAME?.trim() || undefined
   };
 }

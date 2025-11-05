@@ -1,37 +1,78 @@
-type Recording = {
-  id: string;
-  title: string;
-  date: string;
-  duration: string;
-};
-
-const SAMPLE_RECORDINGS: Recording[] = [
-  { id: '1', title: 'Morning notes', date: 'Oct 27, 2025', duration: '00:22' },
-  { id: '2', title: 'Ideas with Jamie', date: 'Jul 27, 2025', duration: '03:07' },
-  { id: '3', title: 'Grocery plan', date: 'Jul 24, 2025', duration: '00:37' }
-];
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { api } from '../lib/api';
+import { useAuth } from '../lib/authStore';
 
 export function RecordingsPage() {
+  const { user, status } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (status === 'idle' || status === 'error') {
+      void navigate({ to: '/login' });
+    }
+  }, [status, navigate]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['recordings'],
+    queryFn: async () => {
+      const response = await api.listRecordings();
+      return response.recordings;
+    },
+    enabled: !!user
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  const recordings = data ?? [];
+
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
       <section className="space-y-3">
         <header className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-white">Recent recordings</h1>
-          <span className="text-xs text-slate-400">{SAMPLE_RECORDINGS.length} items</span>
+          <span className="text-xs text-slate-400">
+            {isLoading ? 'Loading…' : `${recordings.length} items`}
+          </span>
         </header>
         <div className="space-y-2">
-          {SAMPLE_RECORDINGS.map((recording) => (
-            <article
-              key={recording.id}
-              className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 hover:border-brand hover:bg-slate-900 transition"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-100">{recording.title}</h2>
-                <span className="text-xs text-slate-400">{recording.duration}</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">{recording.date}</p>
-            </article>
-          ))}
+          {error ? (
+            <div className="rounded-xl border border-rose-500 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+              Failed to load recordings.
+            </div>
+          ) : null}
+
+          {isLoading ? (
+            <div className="space-y-2">
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </div>
+          ) : recordings.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 py-12 text-center text-sm text-slate-400">
+              No recordings yet.
+            </div>
+          ) : (
+            recordings.map((recording) => (
+              <article
+                key={recording.id}
+                className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-brand hover:bg-slate-900"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-100">{recording.title}</h2>
+                  <span className="text-xs text-slate-400">
+                    {formatDuration(recording.durationMs)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {formatDate(recording.recordedAt ?? recording.createdAt)}
+                </p>
+              </article>
+            ))
+          )}
         </div>
       </section>
 
@@ -64,4 +105,31 @@ export function RecordingsPage() {
       </section>
     </div>
   );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="h-16 animate-pulse rounded-2xl bg-slate-800/50">
+      <span className="sr-only">Loading</span>
+    </div>
+  );
+}
+
+function formatDate(isoString: string | null): string {
+  if (!isoString) return 'Unknown date';
+  try {
+    return new Date(isoString).toLocaleString();
+  } catch {
+    return isoString;
+  }
+}
+
+function formatDuration(durationMs: number | null | undefined): string {
+  if (!durationMs || durationMs <= 0) return '00:00';
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
 }

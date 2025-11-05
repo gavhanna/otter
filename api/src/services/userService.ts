@@ -294,3 +294,21 @@ export async function findUserById(
     updatedAt: user.updatedAt
   };
 }
+
+export async function ensureInitialAdminFromConfig(
+  db: BetterSQLite3Database,
+  admin: CreateAdminInput
+): Promise<{ created: boolean; reason?: string }> {
+  const existingUser = await findUserByEmail(db, admin.email);
+  if (existingUser) {
+    return { created: false, reason: 'user-exists' };
+  }
+
+  const anyUsers = await hasAnyUsers(db);
+  if (anyUsers) {
+    return { created: false, reason: 'users-already-present' };
+  }
+
+  await createInitialAdmin(db, admin);
+  return { created: true };
+}
