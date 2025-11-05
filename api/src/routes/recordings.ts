@@ -8,7 +8,7 @@ import {
     getRecordingForViewer,
     getPrimaryAssetForViewer,
     listRecordings,
-    updateRecordingFavorite,
+    updateRecordingFavourite,
     type CreateRecordingInput,
 } from "../services/recordingService.js";
 
@@ -164,7 +164,7 @@ export async function registerRecordingRoutes(
     );
 
     app.patch(
-        "/recordings/:id/favorite",
+        "/recordings/:id/favourite",
         {
             preHandler: app.authenticate,
         },
@@ -182,15 +182,15 @@ export async function registerRecordingRoutes(
                     .send({ message: "Recording id is required" });
             }
 
-            const body = request.body as { isFavorited?: boolean } | undefined;
-            const isFavorited = Boolean(body?.isFavorited);
+            const body = request.body as { isFavourited?: boolean } | undefined;
+            const isFavourited = Boolean(body?.isFavourited);
 
             try {
-                const updated = await updateRecordingFavorite(
+                const updated = await updateRecordingFavourite(
                     app.db,
                     request.authUser,
                     id,
-                    isFavorited
+                    isFavourited
                 );
 
                 if (!updated) {

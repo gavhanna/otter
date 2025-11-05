@@ -21,7 +21,7 @@ export const recordings = sqliteTable('recordings', {
   description: text('description'),
   durationMs: integer('duration_ms').default(0),
   recordedAt: integer('recorded_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-  isFavorited: integer('is_favorited', { mode: 'boolean' }).notNull().default(false),
+  isFavourited: integer('is_favourited', { mode: 'boolean' }).notNull().default(false),
   transcriptStatus: text('transcript_status'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)

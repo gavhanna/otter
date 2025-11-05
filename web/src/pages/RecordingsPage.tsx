@@ -34,7 +34,7 @@ export function RecordingsPage() {
 
         <div className="mt-8 text-sm text-slate-500">
           <p>• Click on any recording in the sidebar to view its details</p>
-          <p>• Use the tabs to filter between All, Recent, and Favorites</p>
+          <p>• Use the tabs to filter between All, Recent, and Favourites</p>
           <p>• Record new audio using the "New Recording" button</p>
         </div>
       </div>

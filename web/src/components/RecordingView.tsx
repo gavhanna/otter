@@ -29,8 +29,8 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
   const audioSrc = recording && recordingId && recording.id ? `/api/recordings/${recording.id}/stream` : null;
 
 
-  // Handle favorite toggle
-  const handleToggleFavorite = async () => {
+  // Handle favourite toggle
+  const handleToggleFavourite = async () => {
     if (!recording || !recordingId) {
       console.error('Missing recording data:', { recording, recordingId });
       return;
@@ -41,7 +41,7 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
       return;
     }
 
-    const newFavoriteStatus = !recording.isFavorited;
+    const newFavouriteStatus = !recording.isFavourited;
 
     // Create a stable copy to avoid triggering WaveSurfer re-initialization
     const originalRecording = { ...recording };
@@ -51,7 +51,7 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
       if (!oldData?.recording) return oldData;
       return {
         ...oldData,
-        recording: { ...oldData.recording, isFavorited: newFavoriteStatus }
+        recording: { ...oldData.recording, isFavourited: newFavouriteStatus }
       };
     });
 
@@ -61,19 +61,19 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
       return {
         ...oldData,
         recordings: oldData.recordings.map((r: any) =>
-          r.id === recording.id ? { ...r, isFavorited: newFavoriteStatus } : r
+          r.id === recording.id ? { ...r, isFavourited: newFavouriteStatus } : r
         )
       };
     });
 
     try {
-      await api.updateFavorite(recording.id, newFavoriteStatus);
+      await api.updateFavourite(recording.id, newFavouriteStatus);
 
       // Invalidate queries to ensure both sidebar and recording view update
       queryClient.invalidateQueries({ queryKey: ['recordings'] });
       queryClient.invalidateQueries({ queryKey: ['recording', recordingId] });
     } catch (error) {
-      console.error('Failed to update favorite status:', error);
+      console.error('Failed to update favourite status:', error);
       // Revert on error
       queryClient.setQueryData(['recording', recordingId], (oldData: any) => {
         if (!oldData?.recording) return oldData;
@@ -94,7 +94,7 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
     }
   };
 
-  // Initialize WaveSurfer when recording changes (but not when only favorite status changes)
+  // Initialize WaveSurfer when recording changes (but not when only favourite status changes)
   useEffect(() => {
     if (!audioSrc || !waveformRef.current || !recordingId) {
       return;
@@ -221,17 +221,17 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={handleToggleFavorite}
+              onClick={handleToggleFavourite}
               disabled={!recording?.id}
               className={`rounded-lg border px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
                 !recording?.id
                   ? 'border-slate-800 text-slate-500 cursor-not-allowed'
-                  : recording?.isFavorited
+                  : recording?.isFavourited
                   ? 'border-brand bg-brand/20 text-brand hover:bg-brand/30'
                   : 'border-slate-700 text-slate-300 hover:bg-slate-800'
               }`}
             >
-              {recording?.isFavorited ? (
+              {recording?.isFavourited ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
@@ -240,7 +240,7 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                 </svg>
               )}
-              {recording?.isFavorited ? 'Favorited' : 'Favorite'}
+              {recording?.isFavourited ? 'Favourited' : 'Favourite'}
             </button>
             <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

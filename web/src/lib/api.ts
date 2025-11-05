@@ -69,10 +69,10 @@ export const api = {
     request<{ recording: RecordingSummary }>(`api/recordings/${id}`, {
       method: 'GET'
     }),
-  updateFavorite: (id: string, isFavorited: boolean) =>
-    request<{ recording: RecordingSummary }>(`api/recordings/${id}/favorite`, {
+  updateFavourite: (id: string, isFavourited: boolean) =>
+    request<{ recording: RecordingSummary }>(`api/recordings/${id}/favourite`, {
       method: 'PATCH',
-      json: { isFavorited }
+      json: { isFavourited }
     })
 };
 
@@ -91,7 +91,7 @@ export type RecordingSummary = {
   recordedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  isFavorited: boolean;
+  isFavourited: boolean;
   owner: {
     id: string;
     email: string;

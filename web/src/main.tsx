@@ -12,7 +12,7 @@ import './index.css';
 import { AppShell } from './components/AppShell';
 import { RecordingsPage } from './pages/RecordingsPage';
 import { RecentPage } from './pages/RecentPage';
-import { FavoritesPage } from './pages/FavoritesPage';
+import { FavouritesPage } from './pages/FavouritesPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthProvider } from './lib/authStore';
 
@@ -42,13 +42,13 @@ const recentRoute = createRoute({
   component: RecentPage
 });
 
-const favoritesRoute = createRoute({
+const favouritesRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/favorites',
-  component: FavoritesPage
+  path: '/favourites',
+  component: FavouritesPage
 });
 
-const routeTree = rootRoute.addChildren([loginRoute, recordingsRoute, recentRoute, favoritesRoute]);
+const routeTree = rootRoute.addChildren([loginRoute, recordingsRoute, recentRoute, favouritesRoute]);
 
 const router = createRouter({
   routeTree

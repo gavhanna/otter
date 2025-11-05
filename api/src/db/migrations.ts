@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS recordings (
   description TEXT,
   duration_ms INTEGER DEFAULT 0,
   recorded_at INTEGER DEFAULT (unixepoch()),
-  is_favorited INTEGER NOT NULL DEFAULT 0,
+  is_favourited INTEGER NOT NULL DEFAULT 0,
   transcript_status TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
@@ -52,10 +52,10 @@ export function runMigrations(sqlite: SQLiteDatabase): void {
   try {
     sqlite.exec(SCHEMA_SQL);
 
-    // Ensure is_favorited column exists and has proper values
+    // Ensure is_favourited column exists and has proper values
     try {
-      // Add the column if it doesn't exist
-      sqlite.exec('ALTER TABLE recordings ADD COLUMN is_favorited INTEGER NOT NULL DEFAULT 0');
+      // Add the new column if it doesn't exist
+      sqlite.exec('ALTER TABLE recordings ADD COLUMN is_favourited INTEGER NOT NULL DEFAULT 0');
     } catch (error: any) {
       // Column already exists, ignore error
       if (!error.message.includes('duplicate column name')) {
@@ -63,8 +63,19 @@ export function runMigrations(sqlite: SQLiteDatabase): void {
       }
     }
 
+    // If the old column exists, migrate data and drop it
+    try {
+      sqlite.prepare('INSERT OR IGNORE INTO recordings (id, is_favourited) SELECT id, is_favorited FROM recordings').run();
+
+      // Drop the old column after migration
+      sqlite.exec('ALTER TABLE recordings DROP COLUMN is_favorited');
+    } catch (error: any) {
+      // Column doesn't exist or already dropped, continue
+      console.log('Migration note:', error.message);
+    }
+
     // Update any NULL values to 0
-    sqlite.prepare('UPDATE recordings SET is_favorited = 0 WHERE is_favorited IS NULL').run();
+    sqlite.prepare('UPDATE recordings SET is_favourited = 0 WHERE is_favourited IS NULL').run();
 
     sqlite
       .prepare(
