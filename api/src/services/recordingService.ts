@@ -426,6 +426,84 @@ export async function updateRecordingFavourite(
     };
 }
 
+export async function updateRecordingMetadata(
+    db: BetterSQLite3Database,
+    viewer: PublicUser,
+    recordingId: string,
+    updates: { title?: string; description?: string | null }
+): Promise<RecordingSummary | null> {
+    // First verify access
+    const recording = await getRecordingForViewer(db, viewer, recordingId);
+    if (!recording) {
+        return null;
+    }
+
+    // Prepare update object - only include fields that are actually being updated
+    const updateData: any = {
+        updatedAt: new Date(),
+    };
+
+    if (updates.title !== undefined) {
+        const title = updates.title.trim();
+        updateData.title = title.length > 0 ? title : formatDefaultRecordingName();
+    }
+
+    if (updates.description !== undefined) {
+        updateData.description = updates.description && updates.description.trim() ? updates.description.trim() : null;
+    }
+
+    // Update the recording metadata
+    const [updated] = await db
+        .update(recordings)
+        .set(updateData)
+        .where(eq(recordings.id, recordingId))
+        .returning({
+            id: recordings.id,
+            title: recordings.title,
+            description: recordings.description,
+            durationMs: recordings.durationMs,
+            recordedAt: recordings.recordedAt,
+            createdAt: recordings.createdAt,
+            updatedAt: recordings.updatedAt,
+            isFavourited: recordings.isFavourited,
+            ownerId: recordings.ownerId,
+        });
+
+    if (!updated) {
+        return null;
+    }
+
+    // Get owner info for the response
+    const [rowWithOwner] = await db
+        .select({
+            ownerEmail: users.email,
+            ownerDisplayName: users.displayName,
+        })
+        .from(users)
+        .where(eq(users.id, updated.ownerId))
+        .limit(1);
+
+    const owner = rowWithOwner
+        ? {
+              id: updated.ownerId,
+              email: rowWithOwner.ownerEmail,
+              displayName: rowWithOwner.ownerDisplayName ?? null,
+          }
+        : null;
+
+    return {
+        id: updated.id,
+        title: updated.title,
+        description: updated.description ?? null,
+        durationMs: updated.durationMs ?? 0,
+        recordedAt: toIsoString(updated.recordedAt),
+        createdAt: toIsoString(updated.createdAt) ?? new Date().toISOString(),
+        updatedAt: toIsoString(updated.updatedAt) ?? new Date().toISOString(),
+        isFavourited: Boolean(updated.isFavourited),
+        owner,
+    };
+}
+
 export async function deleteRecording(
     db: BetterSQLite3Database,
     viewer: PublicUser,
