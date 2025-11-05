@@ -8,12 +8,14 @@ interface SidebarProps {
     selectedRecordingId: string | null;
     onRecordingSelect: (id: string | null) => void;
     currentPath: string;
+    onNewRecording: () => void;
 }
 
 export function Sidebar({
     selectedRecordingId,
     onRecordingSelect,
     currentPath,
+    onNewRecording,
 }: SidebarProps) {
     const { user, status } = useAuth();
     const [sidebarTab, setSidebarTab] = useState<
@@ -73,11 +75,7 @@ export function Sidebar({
                 </div>
 
                 <button
-                    onClick={() =>
-                        document
-                            .getElementById("recorder-panel")
-                            ?.scrollIntoView({ behavior: "smooth" })
-                    }
+                    onClick={onNewRecording}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2 mt-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
                 >
                     <svg
