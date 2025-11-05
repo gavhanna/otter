@@ -22,17 +22,13 @@ export function RecordingsPage() {
       const response = await api.listRecordings();
       return response.recordings;
     },
-    enabled: !!user
+    enabled: status === 'authenticated'
   });
 
-  if (!user) {
-    return null;
-  }
-
-  const recordings = data ?? [];
+  const recordings = user ? data ?? [] : [];
 
   useEffect(() => {
-    if (recordings.length === 0) {
+    if (!user || recordings.length === 0) {
       setSelectedId(null);
       return;
     }
@@ -40,12 +36,16 @@ export function RecordingsPage() {
     if (!exists) {
       setSelectedId(recordings[0].id);
     }
-  }, [recordings, selectedId]);
+  }, [user, recordings, selectedId]);
 
   const selectedRecording = useMemo(
-    () => recordings.find((recording) => recording.id === selectedId) ?? null,
-    [recordings, selectedId]
+    () => (user ? recordings.find((recording) => recording.id === selectedId) ?? null : null),
+    [user, recordings, selectedId]
   );
+
+  if (!user) {
+    return null;
+  }
 
   const audioSrc = selectedRecording ? `/api/recordings/${selectedRecording.id}/stream` : null;
 
@@ -120,20 +120,12 @@ export function RecordingsPage() {
                 {selectedRecording ? selectedRecording.title : 'Pick an item to start'}
               </h2>
             </div>
-            <div className="flex gap-2">
-              <button
-                className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-40"
-                disabled={!selectedRecording}
-              >
-                Share
-              </button>
-              <button
-                className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-40"
-                disabled={!selectedRecording}
-              >
-                Delete
-              </button>
-            </div>
+            <button
+              className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+              disabled={!selectedRecording}
+            >
+              Delete
+            </button>
           </header>
           {selectedRecording ? (
             <div className="mt-8 space-y-6 text-sm text-slate-300">

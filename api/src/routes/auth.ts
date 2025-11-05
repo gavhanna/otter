@@ -96,6 +96,20 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     reply.clearCookie(app.config.sessionCookieName, { path: '/' });
     return reply.code(204).send();
   });
+
+  app.get(
+    '/auth/me',
+    {
+      preHandler: app.authenticate
+    },
+    async (request, reply) => {
+      if (!request.authUser) {
+        return reply.status(401).send({ message: 'Authentication required' });
+      }
+
+      return reply.status(200).send({ user: request.authUser });
+    }
+  );
 }
 
 type SessionSubject = {

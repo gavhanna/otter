@@ -1,9 +1,11 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, type AuthUser } from './api';
+
+type AuthStatus = 'checking' | 'idle' | 'authenticating' | 'authenticated' | 'error';
 
 type AuthState = {
   user: AuthUser | null;
-  status: 'idle' | 'authenticating' | 'authenticated' | 'error';
+  status: AuthStatus;
   error?: string;
 };
 
@@ -16,7 +18,25 @@ type AuthContextValue = AuthState & {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, status: 'idle' });
+  const [state, setState] = useState<AuthState>({ user: null, status: 'checking' });
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { user } = await api.me();
+        if (!active) return;
+        setState({ user, status: 'authenticated' });
+      } catch (error) {
+        if (!active) return;
+        setState({ user: null, status: 'idle' });
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function login(email: string, password: string) {
     setState((prev) => ({ ...prev, status: 'authenticating', error: undefined }));
@@ -45,7 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...state,
       login,
       logout,
-      setUser: (user) => setState({ user, status: user ? 'authenticated' : 'idle' })
+      setUser: (user) =>
+        setState((prev) => ({
+          user,
+          status: user ? 'authenticated' : prev.status === 'checking' ? 'checking' : 'idle'
+        }))
     }),
     [state]
   );

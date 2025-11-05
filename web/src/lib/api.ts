@@ -47,6 +47,10 @@ export const api = {
     request<void>('api/auth/logout', {
       method: 'POST'
     }),
+  me: () =>
+    request<{ user: AuthUser }>('api/auth/me', {
+      method: 'GET'
+    }),
   bootstrap: (email: string, password: string, displayName?: string) =>
     request<{ user: AuthUser; message: string }>('api/auth/bootstrap', {
       method: 'POST',

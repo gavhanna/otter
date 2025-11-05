@@ -49,9 +49,13 @@ export function LoginForm() {
       <button
         type="submit"
         className="flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={status === 'authenticating'}
+        disabled={status === 'authenticating' || status === 'checking'}
       >
-        {status === 'authenticating' ? 'Signing in…' : 'Sign in'}
+        {status === 'authenticating'
+          ? 'Signing in…'
+          : status === 'checking'
+          ? 'Checking session…'
+          : 'Sign in'}
       </button>
     </form>
   );
