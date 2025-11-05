@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { formatDefaultRecordingName } from "../lib/utils";
 
-type RecorderState = "idle" | "recording" | "preview" | "saving";
+type RecorderState = "idle" | "recording" | "paused" | "preview" | "saving";
 
 const SUPPORTS_MEDIA_RECORDER =
     typeof window !== "undefined" &&
@@ -24,11 +24,19 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
     const [durationMs, setDurationMs] = useState<number>(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [visualizerData, setVisualizerData] = useState<Uint8Array | null>(null);
 
     const recorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const startTimeRef = useRef<number>(0);
     const chunksRef = useRef<Blob[]>([]);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const dataArrayRef = useRef<Uint8Array | null>(null);
+    const animationRef = useRef<number | null>(null);
+    const recordingStartTimeRef = useRef<number>(0);
+    const pausedTimeRef = useRef<number>(0);
 
     const formattedDuration = useMemo(
         () => formatDuration(durationMs),
@@ -73,7 +81,11 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
                     if (prev) URL.revokeObjectURL(prev);
                     return URL.createObjectURL(blob);
                 });
-                setDurationMs(Date.now() - startTimeRef.current);
+
+                // Use the current duration which should be accurate
+                const finalDuration = Date.now() - recordingStartTimeRef.current;
+                setDurationMs(finalDuration);
+
                 setState("preview");
                 cleanupMedia();
             };
@@ -81,11 +93,21 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
             recorder.start();
             recorderRef.current = recorder;
             streamRef.current = stream;
-            startTimeRef.current = Date.now();
+            recordingStartTimeRef.current = Date.now();
+            startTimeRef.current = Date.now(); // Keep for backward compatibility
+            pausedTimeRef.current = 0;
             setError(null);
             setDurationMs(0);
             setTitle(formatDefaultRecordingName());
             setState("recording");
+
+            // Start timer interval
+            intervalRef.current = setInterval(() => {
+                setDurationMs(Date.now() - recordingStartTimeRef.current);
+            }, 100); // Update every 100ms for smooth display
+
+            // Set up audio visualizer
+            setupAudioVisualizer(stream);
         } catch (err) {
             setError(
                 err instanceof Error
@@ -96,10 +118,48 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
         }
     };
 
-    const stopRecording = () => {
+    const pauseRecording = () => {
         if (recorderRef.current && recorderRef.current.state === "recording") {
+            recorderRef.current.pause();
+            pausedTimeRef.current = Date.now();
+            setState("paused");
+
+            // Stop timer interval but keep visualizer running
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        }
+    };
+
+    const resumeRecording = () => {
+        if (recorderRef.current && recorderRef.current.state === "paused") {
+            recorderRef.current.resume();
+
+            // Account for the pause duration
+            const pauseDuration = Date.now() - pausedTimeRef.current;
+            recordingStartTimeRef.current += pauseDuration;
+            pausedTimeRef.current = 0;
+
+            setState("recording");
+
+            // Restart timer interval - track actual recording time
+            intervalRef.current = setInterval(() => {
+                setDurationMs(Date.now() - recordingStartTimeRef.current);
+            }, 100);
+        }
+    };
+
+    const stopRecording = () => {
+        if (recorderRef.current && (recorderRef.current.state === "recording" || recorderRef.current.state === "paused")) {
             recorderRef.current.stop();
             setState("preview");
+
+            // Clear the timer interval
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
         }
     };
 
@@ -113,6 +173,8 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
             if (prev) URL.revokeObjectURL(prev);
             return null;
         });
+        recordingStartTimeRef.current = 0;
+        pausedTimeRef.current = 0;
         cleanupMedia();
     };
 
@@ -150,7 +212,7 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
     const isSaving = state === "saving";
 
     const handleBack = () => {
-        if (state === 'recording') {
+        if (state === 'recording' || state === 'paused') {
             if (window.confirm('Are you sure you want to stop recording? Any unsaved audio will be lost.')) {
                 cleanupMedia();
                 setState('idle');
@@ -184,15 +246,40 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
                         <div className="text-center space-y-8">
                             {/* Recording Status */}
                             <div className="space-y-4">
-                                {state === "recording" && (
-                                    <div className="space-y-4">
+                                {(state === "recording" || state === "paused") && (
+                                    <div className="space-y-6">
                                         <div className="flex items-center justify-center gap-3">
-                                            <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></div>
-                                            <span className="text-rose-400 font-medium">Recording</span>
+                                            <div className={`w-3 h-3 rounded-full ${state === "recording" ? "bg-rose-500 animate-pulse" : "bg-amber-500 animate-none"} ${state === "paused" ? "animate-bounce" : ""}`}></div>
+                                            <span className={`${state === "recording" ? "text-rose-400" : "text-amber-400"} font-medium transition-colors duration-300`}>
+                                                {state === "recording" ? "Recording" : "Paused"}
+                                            </span>
                                         </div>
                                         <div className="text-6xl font-mono font-bold text-white">
                                             {formattedDuration}
                                         </div>
+
+                                        {/* Live Audio Visualizer */}
+                                        {visualizerData && (
+                                            <div className="bg-slate-950/60 rounded-2xl p-4 border border-slate-700">
+                                                <div className="flex items-center justify-center gap-1 h-24">
+                                                    {Array.from({ length: Math.min(32, visualizerData.length) }).map((_, i) => {
+                                                        const value = visualizerData[i * Math.floor(visualizerData.length / 32)] || 0;
+                                                        const height = Math.max(4, (value / 255) * 96); // Max height 96px (24 * 4)
+                                                        return (
+                                                            <div
+                                                                key={i}
+                                                                className={`flex-1 bg-gradient-to-t from-brand to-orange-400 rounded-full transition-all duration-100 ${state === "paused" ? "opacity-50" : ""}`}
+                                                                style={{
+                                                                    height: `${height}px`,
+                                                                    minHeight: '4px',
+                                                                    maxHeight: '96px'
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -230,23 +317,55 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
                                 {state === "idle" && (
                                     <button
                                         onClick={startRecording}
-                                        className="w-20 h-20 rounded-full bg-brand text-slate-950 hover:bg-orange-400 flex items-center justify-center transition-colors shadow-lg"
+                                        className="w-20 h-20 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95 group"
                                     >
-                                        <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-8 h-8 transition-transform duration-200 group-hover:scale-110" fill="currentColor" viewBox="0 0 24 24">
                                             <circle cx="12" cy="12" r="8" />
                                         </svg>
                                     </button>
                                 )}
 
                                 {state === "recording" && (
-                                    <button
-                                        onClick={stopRecording}
-                                        className="w-20 h-20 rounded-full bg-rose-500 text-white hover:bg-rose-400 flex items-center justify-center transition-colors shadow-lg"
-                                    >
-                                        <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                                            <rect x="8" y="8" width="8" height="8" rx="1" />
-                                        </svg>
-                                    </button>
+                                    <div className="flex justify-center gap-4 animate-fade-in">
+                                        <button
+                                            onClick={pauseRecording}
+                                            className="w-16 h-16 rounded-full bg-amber-500 text-white hover:bg-amber-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+                                        >
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                                <rect x="6" y="4" width="4" height="16" rx="1" />
+                                                <rect x="14" y="4" width="4" height="16" rx="1" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={stopRecording}
+                                            className="w-20 h-20 rounded-full bg-rose-500 text-white hover:bg-rose-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+                                        >
+                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                                <rect x="8" y="8" width="8" height="8" rx="1" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {state === "paused" && (
+                                    <div className="flex justify-center gap-4 animate-fade-in">
+                                        <button
+                                            onClick={resumeRecording}
+                                            className="w-16 h-16 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95 animate-pulse"
+                                        >
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M8 5v14l11-7z"/>
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={stopRecording}
+                                            className="w-20 h-20 rounded-full bg-rose-500 text-white hover:bg-rose-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+                                        >
+                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                                <rect x="8" y="8" width="8" height="8" rx="1" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 )}
 
                                 {state === "preview" && (
@@ -303,13 +422,35 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
 
                     {/* Instructions */}
                     {state === "idle" && (
-                        <div className="text-center space-y-4">
-                            <h3 className="text-lg font-semibold text-white">How to record</h3>
-                            <div className="space-y-2 text-sm text-slate-400">
-                                <p>• Click the red button to start recording</p>
-                                <p>• Speak clearly into your microphone</p>
-                                <p>• Click the stop button when you're finished</p>
-                                <p>• Review and save your recording</p>
+                        <div className="text-center space-y-6">
+                            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
+                                <h3 className="text-lg font-semibold text-white mb-4">Getting Started</h3>
+                                <div className="space-y-3 text-sm text-slate-300">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+                                            <span className="text-brand font-semibold text-sm">1</span>
+                                        </div>
+                                        <p>Click the orange button to start recording</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+                                            <span className="text-brand font-semibold text-sm">2</span>
+                                        </div>
+                                        <p>Speak clearly into your microphone</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+                                            <span className="text-brand font-semibold text-sm">3</span>
+                                        </div>
+                                        <p>Use pause button to take breaks</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+                                            <span className="text-brand font-semibold text-sm">4</span>
+                                        </div>
+                                        <p>Click stop when finished and save your recording</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -317,6 +458,33 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
             </div>
         </div>
     );
+
+    function setupAudioVisualizer(stream: MediaStream) {
+        try {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            analyserRef.current.fftSize = 256;
+
+            const source = audioContextRef.current.createMediaStreamSource(stream);
+            source.connect(analyserRef.current);
+
+            const bufferLength = analyserRef.current.frequencyBinCount;
+            dataArrayRef.current = new Uint8Array(bufferLength);
+
+            visualize();
+        } catch (error) {
+            console.warn('Audio visualizer setup failed:', error);
+        }
+    }
+
+    function visualize() {
+        if (!analyserRef.current || !dataArrayRef.current) return;
+
+        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+        setVisualizerData(new Uint8Array(dataArrayRef.current));
+
+        animationRef.current = requestAnimationFrame(visualize);
+    }
 
     function cleanupMedia() {
         if (recorderRef.current && recorderRef.current.state !== "inactive") {
@@ -327,6 +495,19 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
             streamRef.current.getTracks().forEach((track) => track.stop());
             streamRef.current = null;
         }
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+        }
+        if (audioContextRef.current) {
+            audioContextRef.current.close();
+            audioContextRef.current = null;
+        }
+        setVisualizerData(null);
     }
 }
 
