@@ -5,9 +5,15 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerRecordingRoutes } from './routes/recordings.js';
 import type { AppConfig } from './settings.js';
+import { getDb } from './db/client.js';
 
 export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: config.logLevel } });
+  const db = getDb(config);
+
+  app.decorate('config', config);
+  app.decorate('db', db);
+  app.decorateRequest('db', { getter: () => db });
 
   await app.register(fastifyCors, {
     origin: config.corsOrigin,

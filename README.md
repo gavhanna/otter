@@ -20,3 +20,13 @@ npm run dev --workspace web
 ```
 
 Additional setup details live in `docs/PROJECT_PLAN.md`.
+
+## First-Time Bootstrap
+1. Copy the sample environment file: `cp api/.env.example api/.env`.
+2. Start the API and run the bootstrap request once to create the first admin:
+   ```bash
+   curl -X POST http://localhost:4000/auth/bootstrap \
+     -H "Content-Type: application/json" \
+     -d '{"email":"you@example.com","password":"changeme123","displayName":"Your Name"}'
+   ```
+3. You should receive a `201` response confirming the admin account. Subsequent attempts will return `409` to prevent duplicates.
