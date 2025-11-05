@@ -77,6 +77,10 @@ export const api = {
   deleteRecording: (id: string) =>
     request<{ message: string }>(`api/recordings/${id}`, {
       method: 'DELETE'
+    }),
+  getStorageUsage: () =>
+    request<{ storage: StorageUsage }>('api/storage', {
+      method: 'GET'
     })
 };
 
@@ -101,4 +105,12 @@ export type RecordingSummary = {
     email: string;
     displayName: string | null;
   } | null;
+};
+
+export type StorageUsage = {
+  totalBytes: number;
+  totalFiles: number;
+  formattedSize: string;
+  usagePercentage: number;
+  limitBytes?: number;
 };

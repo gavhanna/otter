@@ -7,6 +7,7 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerRecordingRoutes } from './routes/recordings.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { registerStorageRoutes } from './routes/storage.js';
 import type { AppConfig } from './settings.js';
 import { getDb } from './db/client.js';
 import { sessionPlugin } from './plugins/session.js';
@@ -55,6 +56,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     await registerAuthRoutes(instance);
     await registerAdminRoutes(instance);
     await registerRecordingRoutes(instance);
+    await registerStorageRoutes(instance);
   });
 
   return app;

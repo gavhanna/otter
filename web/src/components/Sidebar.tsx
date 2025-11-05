@@ -31,7 +31,18 @@ export function Sidebar({
         enabled: status === "authenticated",
     });
 
-    const recordings = user ? data ?? [] : [];
+    const { data: storageData, isLoading: isLoadingStorage } = useQuery({
+        queryKey: ["storage"],
+        queryFn: async () => {
+            const response = await api.getStorageUsage();
+            return response.storage;
+        },
+        enabled: status === "authenticated",
+        refetchInterval: 30000, // Refetch every 30 seconds
+    });
+
+    const recordings = user ? (data || []) : [];
+    const storageUsage = storageData || { formattedSize: "0 B", usagePercentage: 0, totalFiles: 0 };
 
     // Filter recordings based on selected tab
     const filteredRecordings = recordings.filter((recording) => {
@@ -216,12 +227,42 @@ export function Sidebar({
                     </h3>
                     <div className="space-y-2">
                         <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>Storage used</span>
-                            <span>2.3 GB</span>
+                            <span>
+                                {isLoadingStorage ? (
+                                    <span className="flex items-center gap-1">
+                                        <div className="w-3 h-3 border border-slate-600 border-t-brand rounded-full animate-spin"></div>
+                                        Loading...
+                                    </span>
+                                ) : (
+                                    `${storageUsage.totalFiles} file${storageUsage.totalFiles !== 1 ? 's' : ''}`
+                                )}
+                            </span>
+                            <span>{storageUsage.formattedSize}</span>
                         </div>
-                        <div className="h-2 w-full rounded-full bg-slate-800">
-                            <div className="h-2 w-1/4 rounded-full bg-brand"></div>
+                        <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all duration-500 ease-out ${
+                                    storageUsage.usagePercentage > 80
+                                        ? 'bg-rose-500'
+                                        : storageUsage.usagePercentage > 60
+                                        ? 'bg-amber-500'
+                                        : 'bg-brand'
+                                }`}
+                                style={{ width: `${Math.min(100, storageUsage.usagePercentage)}%` }}
+                            ></div>
                         </div>
+                        {storageUsage.usagePercentage > 60 && (
+                            <div className={`text-xs ${
+                                storageUsage.usagePercentage > 80
+                                    ? 'text-rose-400'
+                                    : 'text-amber-400'
+                            }`}>
+                                {storageUsage.usagePercentage > 80
+                                    ? '⚠️ Storage almost full'
+                                    : 'ℹ️ Storage getting full'
+                                }
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
