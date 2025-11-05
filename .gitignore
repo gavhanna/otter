@@ -2,6 +2,7 @@
 node_modules/
 dist/
 build/
+api/data/
 
 # Logs
 npm-debug.log*
@@ -25,4 +26,3 @@ Thumbs.db
 # SQLite
 *.sqlite
 *.sqlite-journal
-/data/

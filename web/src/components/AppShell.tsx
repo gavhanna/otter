@@ -43,9 +43,12 @@ export function AppShell({ children }: AppShellProps) {
             <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">⌘K</span>
           </div>
           <div className="flex items-center gap-3">
-            <button className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-slate-950 shadow">
+            <a
+              href="#recorder-panel"
+              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-slate-950 shadow hover:bg-orange-400"
+            >
               New Recording
-            </button>
+            </a>
             <div className="flex items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-white">
                 {user?.displayName?.slice(0, 1)?.toUpperCase() ?? 'U'}

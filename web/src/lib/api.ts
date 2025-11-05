@@ -56,10 +56,10 @@ export const api = {
     request<{ recordings: RecordingSummary[] }>('api/recordings', {
       method: 'GET'
     }),
-  createRecording: (input: { title: string; description?: string }) =>
+  createRecording: (formData: FormData) =>
     request<{ recording: RecordingSummary }>('api/recordings', {
       method: 'POST',
-      json: input
+      body: formData
     })
 };
 

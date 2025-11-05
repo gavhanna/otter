@@ -1,6 +1,7 @@
 import { type FastifyInstance } from 'fastify';
+import type { MultipartFile } from '@fastify/multipart';
 import {
-  createRecording,
+  createRecordingWithFile,
   getRecordingForViewer,
   listRecordings,
   type CreateRecordingInput
@@ -39,18 +40,62 @@ export async function registerRecordingRoutes(app: FastifyInstance): Promise<voi
         return reply.status(401).send({ message: 'Authentication required' });
       }
 
-      const body = request.body as Partial<CreateRecordingInput> | undefined;
-      if (!body?.title) {
+      if (!request.isMultipart()) {
+        return reply.status(400).send({ message: 'Multipart form data required' });
+      }
+
+      const fields: Record<string, string> = {};
+      let audioPart: MultipartFile | null = null;
+
+      for await (const part of request.parts()) {
+        if (part.type === 'file') {
+          if (part.fieldname === 'audio' && !audioPart) {
+            audioPart = part;
+          } else {
+            part.file.resume();
+          }
+        } else if (part.type === 'field') {
+          fields[part.fieldname] = typeof part.value === 'string' ? part.value : String(part.value);
+        }
+      }
+
+      const title = fields.title?.trim() ?? '';
+      if (!title) {
+        if (audioPart) {
+          audioPart.file.resume();
+        }
         return reply.status(400).send({ message: 'Title is required' });
       }
 
+      if (!audioPart) {
+        return reply.status(400).send({ message: 'Audio file is required' });
+      }
+
+      const durationParsed = fields.durationMs ? Number(fields.durationMs) : undefined;
+      const durationMs =
+        durationParsed !== undefined && Number.isFinite(durationParsed) ? durationParsed : undefined;
+
+      const description =
+        fields.description && fields.description.trim().length > 0 ? fields.description.trim() : null;
+      const recordedAt = fields.recordedAt && fields.recordedAt.length > 0 ? fields.recordedAt : null;
+
       try {
-        const recording = await createRecording(app.db, request.authUser, {
-          title: body.title,
-          description: body.description ?? null,
-          durationMs: body.durationMs ?? undefined,
-          recordedAt: body.recordedAt ?? null
-        });
+        const recording = await createRecordingWithFile(
+          app.db,
+          request.authUser,
+          app.config.storageDir,
+          {
+            title,
+            description,
+            durationMs,
+            recordedAt
+          },
+          {
+            filename: audioPart.filename,
+            mimetype: audioPart.mimetype,
+            stream: audioPart.file
+          }
+        );
 
         return reply.status(201).send({ recording });
       } catch (error) {

@@ -1,6 +1,12 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdirSync, createWriteStream } from 'node:fs';
+import { unlink } from 'node:fs/promises';
+import { dirname, extname, join } from 'node:path';
+import { PassThrough } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { desc, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { recordings, users } from '../db/schema.js';
+import { recordingAssets, recordings, users } from '../db/schema.js';
 import type { PublicUser } from './userService.js';
 
 type RecordingRow = {
@@ -42,6 +48,12 @@ export type RecordingListFilters = {
   ownerId?: string;
 };
 
+export type AudioUpload = {
+  filename?: string;
+  mimetype?: string;
+  stream: NodeJS.ReadableStream;
+};
+
 export async function listRecordings(
   db: BetterSQLite3Database,
   viewer: PublicUser,
@@ -81,37 +93,47 @@ export async function createRecording(
   owner: PublicUser,
   input: CreateRecordingInput
 ): Promise<RecordingSummary> {
-  const title = input.title.trim();
-  if (title.length === 0) {
-    throw new Error('Title is required');
-  }
-
-  const description = input.description ? input.description.trim() : null;
-  const durationMs = normalizeDuration(input.durationMs);
-  const recordedAt = parseRecordedAt(input.recordedAt) ?? new Date();
-
-  const [inserted] = await db
-    .insert(recordings)
-    .values({
-      ownerId: owner.id,
-      title,
-      description,
-      durationMs,
-      recordedAt
-    })
-    .returning({
-      id: recordings.id
-    });
-
-  if (!inserted) {
-    throw new Error('Failed to create recording');
-  }
-
-  const recording = await getRecordingForViewer(db, owner, inserted.id);
+  const recordingId = await insertRecording(db, prepareRecordingValues(owner, input));
+  const recording = await getRecordingForViewer(db, owner, recordingId);
   if (!recording) {
     throw new Error('Recording not found after creation');
   }
+  return recording;
+}
 
+export async function createRecordingWithFile(
+  db: BetterSQLite3Database,
+  owner: PublicUser,
+  storageDir: string,
+  input: CreateRecordingInput,
+  audio: AudioUpload
+): Promise<RecordingSummary> {
+  const values = prepareRecordingValues(owner, input);
+  const recordingId = await insertRecording(db, values);
+
+  let stored: PersistedRecordingFile | null = null;
+  try {
+    stored = await persistRecordingFile(storageDir, owner.id, recordingId, audio);
+
+    await db.insert(recordingAssets).values({
+      recordingId,
+      storagePath: stored.storagePath,
+      contentType: stored.contentType,
+      sizeBytes: stored.sizeBytes,
+      checksum: stored.checksum
+    });
+  } catch (error) {
+    await db.delete(recordings).where(eq(recordings.id, recordingId));
+    if (stored) {
+      await safeUnlink(join(storageDir, stored.storagePath));
+    }
+    throw error;
+  }
+
+  const recording = await getRecordingForViewer(db, owner, recordingId);
+  if (!recording) {
+    throw new Error('Recording not found after creation');
+  }
   return recording;
 }
 
@@ -156,6 +178,127 @@ export async function ensureRecordingAccess(
   recordingId: string
 ): Promise<RecordingSummary | null> {
   return getRecordingForViewer(db, viewer, recordingId);
+}
+
+type RecordingInsertValues = {
+  ownerId: string;
+  title: string;
+  description: string | null;
+  durationMs: number;
+  recordedAt: Date;
+};
+
+type PersistedRecordingFile = {
+  storagePath: string;
+  contentType: string;
+  sizeBytes: number;
+  checksum: string;
+};
+
+async function insertRecording(db: BetterSQLite3Database, values: RecordingInsertValues): Promise<string> {
+  const [inserted] = await db
+    .insert(recordings)
+    .values(values)
+    .returning({
+      id: recordings.id
+    });
+
+  if (!inserted) {
+    throw new Error('Failed to create recording');
+  }
+
+  return inserted.id;
+}
+
+function prepareRecordingValues(owner: PublicUser, input: CreateRecordingInput): RecordingInsertValues {
+  const title = (input.title ?? '').trim();
+  if (title.length === 0) {
+    throw new Error('Title is required');
+  }
+
+  const description = input.description ? input.description.trim() : null;
+  const durationMs = normalizeDuration(input.durationMs);
+  const recordedAt = parseRecordedAt(input.recordedAt) ?? new Date();
+
+  return {
+    ownerId: owner.id,
+    title,
+    description,
+    durationMs,
+    recordedAt
+  };
+}
+
+async function persistRecordingFile(
+  storageDir: string,
+  ownerId: string,
+  recordingId: string,
+  audio: AudioUpload
+): Promise<PersistedRecordingFile> {
+  const extension = inferExtension(audio.mimetype, audio.filename);
+  const relativePath = join(ownerId, `${recordingId}-${randomUUID()}${extension}`);
+  const absolutePath = join(storageDir, relativePath);
+
+  mkdirSync(dirname(absolutePath), { recursive: true });
+
+  const hash = createHash('sha256');
+  const passThrough = new PassThrough();
+  let sizeBytes = 0;
+
+  passThrough.on('data', (chunk: Buffer) => {
+    sizeBytes += chunk.length;
+    hash.update(chunk);
+  });
+
+  try {
+    await pipeline(audio.stream, passThrough, createWriteStream(absolutePath));
+  } catch (error) {
+    await safeUnlink(absolutePath);
+    throw error;
+  }
+
+  return {
+    storagePath: relativePath,
+    contentType: audio.mimetype ?? 'application/octet-stream',
+    sizeBytes,
+    checksum: hash.digest('hex')
+  };
+}
+
+async function safeUnlink(path: string): Promise<void> {
+  try {
+    await unlink(path);
+  } catch (error: any) {
+    if (error && error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+}
+
+function inferExtension(mimetype?: string, filename?: string): string {
+  const normalizedMime = mimetype?.split(';')[0]?.toLowerCase();
+  const mimeMap: Record<string, string> = {
+    'audio/webm': '.webm',
+    'audio/ogg': '.ogg',
+    'audio/mpeg': '.mp3',
+    'audio/wav': '.wav',
+    'audio/mp4': '.m4a',
+    'audio/aac': '.aac',
+    'audio/flac': '.flac'
+  };
+
+  if (normalizedMime && mimeMap[normalizedMime]) {
+    return mimeMap[normalizedMime];
+  }
+
+  if (filename) {
+    const existing = extname(filename);
+    if (existing) {
+      return existing;
+    }
+  }
+
+  return '.webm';
 }
 
 function mapRowToSummary(row: RecordingRow): RecordingSummary {
