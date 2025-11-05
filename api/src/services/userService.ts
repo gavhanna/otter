@@ -1,20 +1,27 @@
 import argon2 from 'argon2';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { InferModel } from 'drizzle-orm';
 import { users } from '../db/schema.js';
 
+type UserRecord = InferModel<typeof users>;
 type CreateAdminInput = {
   email: string;
   password: string;
   displayName?: string;
 };
 
-type PublicUser = {
-  id: string;
-  email: string;
-  displayName: string | null;
-  role: 'admin' | 'user';
-};
+export type PublicUser = Pick<UserRecord, 'id' | 'email' | 'displayName' | 'role'>;
+type UserWithSecret = Pick<UserRecord, 'id' | 'email' | 'displayName' | 'role' | 'passwordHash' | 'isActive'>;
+
+export function toPublicUser(user: PublicUser | UserWithSecret): PublicUser {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName ?? null,
+    role: user.role
+  };
+}
 
 export async function hasAnyUsers(db: BetterSQLite3Database): Promise<boolean> {
   const existing = await db.select({ id: users.id }).from(users).limit(1);
@@ -31,6 +38,25 @@ export async function findUserByEmail(
       email: users.email,
       displayName: users.displayName,
       role: users.role
+    })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function findUserWithPassword(
+  db: BetterSQLite3Database,
+  email: string
+): Promise<UserWithSecret | null> {
+  const result = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      displayName: users.displayName,
+      role: users.role,
+      passwordHash: users.passwordHash,
+      isActive: users.isActive
     })
     .from(users)
     .where(eq(users.email, email))
