@@ -45,3 +45,25 @@ Additional setup details live in `docs/PROJECT_PLAN.md`.
     -b cookies.txt
   ```
   Cookies are stored in `cookies.txt` above so you can simulate a browser session during manual testing.
+
+## Admin API (manual smoke tests)
+- List users:
+  ```bash
+  curl http://localhost:4000/admin/users \
+    -b cookies.txt
+  ```
+- Create a user:
+  ```bash
+  curl -X POST http://localhost:4000/admin/users \
+    -H "Content-Type: application/json" \
+    -b cookies.txt \
+    -d '{"email":"friend@example.com","password":"supersecret","displayName":"Friend"}'
+  ```
+- Toggle registration:
+  ```bash
+  curl -X PATCH http://localhost:4000/admin/settings \
+    -H "Content-Type: application/json" \
+    -b cookies.txt \
+    -d '{"registrationEnabled":true}'
+  ```
+  All admin endpoints expect an authenticated cookie session (login first).

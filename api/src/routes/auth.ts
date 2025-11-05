@@ -51,6 +51,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
         displayName: displayName ?? undefined
       });
       await issueSessionCookie(app, reply, { id: user.id, role: user.role });
+      request.authUser = user;
 
       return reply.status(201).send({
         user,
@@ -83,6 +84,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await issueSessionCookie(app, reply, { id: user.id, role: user.role });
+    request.authUser = toPublicUser(user);
 
     return reply.status(200).send({
       user: toPublicUser(user),

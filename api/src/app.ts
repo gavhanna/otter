@@ -5,8 +5,10 @@ import fastifyJwt from '@fastify/jwt';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerRecordingRoutes } from './routes/recordings.js';
+import { registerAdminRoutes } from './routes/admin.js';
 import type { AppConfig } from './settings.js';
 import { getDb } from './db/client.js';
+import { sessionPlugin } from './plugins/session.js';
 
 export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: config.logLevel } });
@@ -37,9 +39,12 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     }
   });
 
+  await app.register(sessionPlugin);
+
   await app.register(async (instance) => {
     await registerHealthRoutes(instance);
     await registerAuthRoutes(instance);
+    await registerAdminRoutes(instance);
     await registerRecordingRoutes(instance);
   });
 
