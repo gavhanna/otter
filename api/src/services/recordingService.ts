@@ -4,7 +4,7 @@ import { unlink } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { PassThrough } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { recordingAssets, recordings, users } from "../db/schema.js";
 import type { PublicUser } from "./userService.js";
@@ -22,6 +22,17 @@ type RecordingRow = {
     ownerEmail: string | null;
     ownerDisplayName: string | null;
     isFavourited: boolean | null;
+    // Asset fields from JOIN (nullable)
+    assetStoragePath: string | null;
+    assetContentType: string | null;
+    assetSizeBytes: number | null;
+};
+
+export type RecordingAsset = {
+    recordingId: string;
+    storagePath: string;
+    contentType: string;
+    sizeBytes: number;
 };
 
 export type RecordingSummary = {
@@ -37,6 +48,10 @@ export type RecordingSummary = {
         id: string;
         email: string;
         displayName: string | null;
+    } | null;
+    asset: {
+        sizeBytes: number;
+        contentType: string;
     } | null;
 };
 
@@ -55,13 +70,6 @@ export type AudioUpload = {
     filename?: string;
     mimetype?: string;
     stream: NodeJS.ReadableStream;
-};
-
-export type RecordingAsset = {
-    recordingId: string;
-    storagePath: string;
-    contentType: string;
-    sizeBytes: number;
 };
 
 export async function listRecordings(
@@ -101,7 +109,12 @@ export async function listRecordings(
         desc(recordings.recordedAt),
         desc(recordings.createdAt)
     );
-    return rows.map(mapRowToSummary);
+    return rows.map(row => mapRowToSummary({
+        ...row,
+        assetStoragePath: null,
+        assetContentType: null,
+        assetSizeBytes: null,
+    }, null));
 }
 
 export async function createRecording(
@@ -166,8 +179,10 @@ export async function getRecordingForViewer(
     viewer: PublicUser,
     recordingId: string
 ): Promise<RecordingSummary | null> {
+    // Single optimized query to get recording data, user info, and asset info
     const [row] = await db
         .select({
+            // Recording fields
             id: recordings.id,
             title: recordings.title,
             description: recordings.description,
@@ -177,11 +192,29 @@ export async function getRecordingForViewer(
             updatedAt: recordings.updatedAt,
             isFavourited: recordings.isFavourited,
             ownerId: recordings.ownerId,
+            // User fields
             ownerEmail: users.email,
             ownerDisplayName: users.displayName,
+            // Asset fields (LEFT JOIN, so null if no asset)
+            assetStoragePath: recordingAssets.storagePath,
+            assetContentType: recordingAssets.contentType,
+            assetSizeBytes: recordingAssets.sizeBytes,
         })
         .from(recordings)
         .leftJoin(users, eq(recordings.ownerId, users.id))
+        .leftJoin(
+            recordingAssets,
+            and(
+                eq(recordingAssets.recordingId, recordings.id),
+                // Only get the primary (first) asset
+                sql`recording_assets.id = (
+                    SELECT id FROM recording_assets
+                    WHERE recording_id = recordings.id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                )`
+            )
+        )
         .where(eq(recordings.id, recordingId))
         .limit(1);
 
@@ -194,15 +227,34 @@ export async function getRecordingForViewer(
         return null;
     }
 
-    return mapRowToSummary(row);
+    // Create asset object from the joined data
+    const asset = row.assetStoragePath ? {
+        recordingId: recordingId,
+        storagePath: row.assetStoragePath,
+        contentType: row.assetContentType || '',
+        sizeBytes: row.assetSizeBytes || 0,
+    } : null;
+
+    return mapRowToSummary(row, asset);
 }
 
 export async function ensureRecordingAccess(
     db: BetterSQLite3Database,
     viewer: PublicUser,
     recordingId: string
-): Promise<RecordingSummary | null> {
-    return getRecordingForViewer(db, viewer, recordingId);
+): Promise<boolean> {
+    const [row] = await db
+        .select({ ownerId: recordings.ownerId })
+        .from(recordings)
+        .where(eq(recordings.id, recordingId))
+        .limit(1);
+
+    if (!row) {
+        return false;
+    }
+
+    const isOwner = row.ownerId === viewer.id;
+    return viewer.role === "admin" || isOwner;
 }
 
 export async function getPrimaryAssetForViewer(
@@ -423,6 +475,7 @@ export async function updateRecordingFavourite(
         updatedAt: toIsoString(updated.updatedAt) ?? new Date().toISOString(),
         isFavourited: Boolean(updated.isFavourited),
         owner,
+        asset: null, // We don't need to fetch asset for these updates
     };
 }
 
@@ -501,6 +554,7 @@ export async function updateRecordingMetadata(
         updatedAt: toIsoString(updated.updatedAt) ?? new Date().toISOString(),
         isFavourited: Boolean(updated.isFavourited),
         owner,
+        asset: null, // We don't need to fetch asset for these updates
     };
 }
 
@@ -552,7 +606,7 @@ export async function deleteRecording(
     }
 }
 
-function mapRowToSummary(row: RecordingRow): RecordingSummary {
+function mapRowToSummary(row: RecordingRow, asset?: RecordingAsset | null): RecordingSummary {
     const owner =
         row.ownerId && row.ownerEmail
             ? {
@@ -572,6 +626,10 @@ function mapRowToSummary(row: RecordingRow): RecordingSummary {
         updatedAt: toIsoString(row.updatedAt) ?? new Date().toISOString(),
         isFavourited: Boolean(row.isFavourited),
         owner,
+        asset: asset ? {
+            sizeBytes: asset.sizeBytes,
+            contentType: asset.contentType,
+        } : null,
     };
 }
 

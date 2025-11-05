@@ -110,6 +110,10 @@ export type RecordingSummary = {
     email: string;
     displayName: string | null;
   } | null;
+  asset: {
+    sizeBytes: number;
+    contentType: string;
+  } | null;
 };
 
 export type StorageUsage = {

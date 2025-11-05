@@ -750,11 +750,21 @@ export function RecordingView({
                                 <span className="text-slate-400">
                                     File Size:
                                 </span>
-                                <p className="text-white mt-1">~2.3 MB</p>
+                                <p className="text-white mt-1">
+                                    {recording.asset?.sizeBytes
+                                        ? formatFileSize(recording.asset.sizeBytes)
+                                        : "Unknown"
+                                    }
+                                </p>
                             </div>
                             <div>
                                 <span className="text-slate-400">Format:</span>
-                                <p className="text-white mt-1">WebM Audio</p>
+                                <p className="text-white mt-1">
+                                    {recording.asset?.contentType
+                                        ? getFormatName(recording.asset.contentType)
+                                        : "Unknown"
+                                    }
+                                </p>
                             </div>
                         </div>
                         {recording.description && (
@@ -878,4 +888,36 @@ function formatTime(seconds: number): string {
         .toString()
         .padStart(2, "0");
     return `${mins}:${secs}`;
+}
+
+function formatFileSize(bytes: number): string {
+    if (!bytes || bytes === 0) return "0 B";
+
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes;
+    let unitIndex = 0;
+
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+
+    return `${size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function getFormatName(contentType: string): string {
+    if (!contentType) return "Unknown";
+
+    const mimeToFormat: Record<string, string> = {
+        "audio/webm": "WebM Audio",
+        "audio/ogg": "OGG Audio",
+        "audio/mpeg": "MP3 Audio",
+        "audio/wav": "WAV Audio",
+        "audio/mp4": "M4A Audio",
+        "audio/aac": "AAC Audio",
+        "audio/flac": "FLAC Audio",
+        "audio/mp3": "MP3 Audio", // Some browsers use audio/mp3
+    };
+
+    return mimeToFormat[contentType.toLowerCase()] || contentType.split("/")[1]?.toUpperCase() || "Audio";
 }
