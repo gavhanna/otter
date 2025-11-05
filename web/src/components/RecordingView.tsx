@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import WaveSurfer from 'wavesurfer.js';
 import { api } from '../lib/api';
 
 interface RecordingViewProps {
@@ -10,6 +11,9 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [isWaveformReady, setIsWaveformReady] = useState(false);
+  const waveformRef = useRef<HTMLDivElement>(null);
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
 
   const { data: recording, isLoading, error } = useQuery({
     queryKey: ['recording', recordingId],
@@ -22,6 +26,76 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
   });
 
   const audioSrc = recording ? `/api/recordings/${recording.id}/stream` : null;
+
+  // Initialize WaveSurfer when recording changes
+  useEffect(() => {
+    if (!audioSrc || !waveformRef.current) return;
+
+    // Destroy existing instance
+    if (wavesurferRef.current) {
+      wavesurferRef.current.destroy();
+    }
+
+    // Create new WaveSurfer instance
+    const wavesurfer = WaveSurfer.create({
+      container: waveformRef.current,
+      waveColor: '#64748b', // slate-500
+      progressColor: '#fb923c', // brand (orange)
+      cursorColor: '#f8fafc', // slate-50
+      barWidth: 2,
+      barRadius: 3,
+      cursorWidth: 1,
+      height: 80,
+      barGap: 3,
+      normalize: true,
+      backend: 'WebAudio',
+      mediaControls: false,
+      interact: true,
+      hideScrollbar: true,
+      autoScroll: false,
+    });
+
+    // Event listeners
+    wavesurfer.on('ready', () => {
+      setIsWaveformReady(true);
+      setIsPlaying(false);
+    });
+
+    wavesurfer.on('play', () => {
+      setIsPlaying(true);
+    });
+
+    wavesurfer.on('pause', () => {
+      setIsPlaying(false);
+    });
+
+    wavesurfer.on('timeupdate', (currentTime) => {
+      setCurrentTime(currentTime);
+    });
+
+    wavesurfer.on('finish', () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    });
+
+    wavesurfer.on('error', (error) => {
+      console.error('WaveSurfer error:', error);
+      setIsWaveformReady(false);
+    });
+
+    // Load audio
+    wavesurfer.load(audioSrc);
+    wavesurferRef.current = wavesurfer;
+
+    // Cleanup
+    return () => {
+      if (wavesurferRef.current) {
+        wavesurferRef.current.destroy();
+        wavesurferRef.current = null;
+      }
+      setIsWaveformReady(false);
+    };
+  }, [audioSrc, recordingId]);
 
   if (!recordingId) {
     return (
@@ -101,26 +175,91 @@ export function RecordingView({ recordingId }: RecordingViewProps) {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-6 space-y-8">
-          {/* Audio Player */}
+          {/* Waveform and Audio Player */}
           <section className="bg-slate-900/70 rounded-2xl border border-slate-800 p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Audio Player</h2>
-            {audioSrc && (
-              <audio
-                controls
-                src={audioSrc}
-                className="w-full rounded-xl bg-slate-950/60"
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              />
-            )}
-          </section>
 
-          {/* Waveform Visualization (Placeholder) */}
-          <section className="bg-slate-900/70 rounded-2xl border border-slate-800 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Waveform</h2>
-            <div className="h-32 bg-slate-800 rounded-xl flex items-center justify-center">
-              <p className="text-slate-500">Waveform visualization coming soon</p>
+            {/* Waveform */}
+            <div className="mb-4">
+              <div
+                ref={waveformRef}
+                className="rounded-xl bg-slate-950/60 min-h-[80px] flex items-center justify-center"
+              >
+                {!isWaveformReady && audioSrc && (
+                  <div className="flex items-center gap-3 text-slate-500">
+                    <div className="w-4 h-4 border-2 border-slate-600 border-t-brand rounded-full animate-spin"></div>
+                    <span className="text-sm">Loading waveform...</span>
+                  </div>
+                )}
+                {!audioSrc && (
+                  <p className="text-slate-500">No audio available</p>
+                )}
+              </div>
+            </div>
+
+            {/* Playback Controls */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    if (wavesurferRef.current) {
+                      if (isPlaying) {
+                        wavesurferRef.current.pause();
+                      } else {
+                        wavesurferRef.current.play();
+                      }
+                    }
+                  }}
+                  disabled={!isWaveformReady}
+                  className="w-12 h-12 rounded-full bg-brand text-slate-950 flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isPlaying ? (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  )}
+                </button>
+
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(recording?.durationMs ? recording.durationMs / 1000 : 0)}</span>
+                  </div>
+                  <div className="h-1 bg-slate-800 rounded-full">
+                    <div
+                      className="h-1 bg-brand rounded-full transition-all duration-100"
+                      style={{
+                        width: `${recording?.durationMs ? (currentTime / (recording.durationMs / 1000)) * 100 : 0}%`
+                      }}
+                    ></div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                  </svg>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={volume}
+                    onChange={(e) => {
+                      const newVolume = parseFloat(e.target.value);
+                      setVolume(newVolume);
+                      if (wavesurferRef.current) {
+                        wavesurferRef.current.setVolume(newVolume);
+                      }
+                    }}
+                    className="w-20 accent-brand"
+                  />
+                </div>
+              </div>
             </div>
           </section>
 
@@ -194,4 +333,10 @@ function formatDuration(durationMs: number | null | undefined): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = (totalSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${seconds}`;
+}
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${mins}:${secs}`;
 }
