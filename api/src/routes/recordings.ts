@@ -1,8 +1,12 @@
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { type FastifyInstance } from 'fastify';
 import type { MultipartFile } from '@fastify/multipart';
 import {
   createRecordingWithFile,
   getRecordingForViewer,
+  getPrimaryAssetForViewer,
   listRecordings,
   type CreateRecordingInput
 } from '../services/recordingService.js';
@@ -126,6 +130,63 @@ export async function registerRecordingRoutes(app: FastifyInstance): Promise<voi
       }
 
       return { recording };
+    }
+  );
+
+  app.get(
+    '/recordings/:id/stream',
+    {
+      preHandler: app.authenticate
+    },
+    async (request, reply) => {
+      if (!request.authUser) {
+        return reply.status(401).send({ message: 'Authentication required' });
+      }
+
+      const { id } = request.params as { id: string };
+      if (!id) {
+        return reply.status(400).send({ message: 'Recording id is required' });
+      }
+
+      const asset = await getPrimaryAssetForViewer(app.db, request.authUser, id);
+      if (!asset) {
+        return reply.status(404).send({ message: 'Recording not found' });
+      }
+
+      const filePath = join(app.config.storageDir, asset.storagePath);
+
+      try {
+        const fileStat = await stat(filePath);
+        const rangeHeader = request.headers.range;
+        const fileSize = fileStat.size;
+
+        reply.header('Accept-Ranges', 'bytes');
+        reply.header('Content-Type', asset.contentType);
+
+        if (rangeHeader) {
+          const matches = /bytes=(\d+)-(\d*)/.exec(rangeHeader);
+          if (matches) {
+            const start = Number(matches[1]);
+            const end = matches[2] ? Number(matches[2]) : fileSize - 1;
+            if (start >= fileSize || end >= fileSize) {
+              reply.header('Content-Range', `bytes */${fileSize}`);
+              return reply.status(416).send();
+            }
+            const chunkSize = end - start + 1;
+            reply.header('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+            reply.header('Content-Length', chunkSize);
+            reply.code(206);
+            return reply.send(createReadStream(filePath, { start, end }));
+          }
+        }
+
+        reply.header('Content-Length', fileSize);
+        reply.code(200);
+        return reply.send(createReadStream(filePath));
+      } catch (error) {
+        request.log.error(error, 'Failed to stream recording');
+        return reply.status(500).send({ message: 'Unable to stream recording' });
+      }
     }
   );
 }

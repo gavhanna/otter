@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RecorderPanel } from '../components/RecorderPanel';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/authStore';
@@ -8,6 +8,7 @@ import { useAuth } from '../lib/authStore';
 export function RecordingsPage() {
   const { user, status } = useAuth();
   const navigate = useNavigate();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'idle' || status === 'error') {
@@ -29,6 +30,24 @@ export function RecordingsPage() {
   }
 
   const recordings = data ?? [];
+
+  useEffect(() => {
+    if (recordings.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    const exists = selectedId ? recordings.some((recording) => recording.id === selectedId) : false;
+    if (!exists) {
+      setSelectedId(recordings[0].id);
+    }
+  }, [recordings, selectedId]);
+
+  const selectedRecording = useMemo(
+    () => recordings.find((recording) => recording.id === selectedId) ?? null,
+    [recordings, selectedId]
+  );
+
+  const audioSrc = selectedRecording ? `/api/recordings/${selectedRecording.id}/stream` : null;
 
   return (
     <div className="space-y-6">
@@ -62,7 +81,21 @@ export function RecordingsPage() {
               recordings.map((recording) => (
                 <article
                   key={recording.id}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 transition hover:border-brand hover:bg-slate-900"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedId(recording.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedId(recording.id);
+                    }
+                  }}
+                  className={[
+                    'rounded-2xl border p-4 transition focus:outline-none focus:ring-2 focus:ring-brand',
+                    recording.id === selectedId
+                      ? 'border-brand bg-brand/10 text-white'
+                      : 'border-slate-800 bg-slate-900/60 hover:border-brand hover:bg-slate-900'
+                  ].join(' ')}
                 >
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-slate-100">{recording.title}</h2>
@@ -83,28 +116,56 @@ export function RecordingsPage() {
           <header className="flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-400">Selected recording</p>
-              <h2 className="text-xl font-semibold text-white">Pick an item to start</h2>
+              <h2 className="text-xl font-semibold text-white">
+                {selectedRecording ? selectedRecording.title : 'Pick an item to start'}
+              </h2>
             </div>
             <div className="flex gap-2">
-              <button className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800">
+              <button
+                className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+                disabled={!selectedRecording}
+              >
                 Share
               </button>
-              <button className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800">
+              <button
+                className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-40"
+                disabled={!selectedRecording}
+              >
                 Delete
               </button>
             </div>
           </header>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 text-slate-500">
-            <div className="flex h-32 w-full items-center justify-center rounded-2xl border border-dashed border-slate-700">
-              Waveform preview coming soon
+          {selectedRecording ? (
+            <div className="mt-8 space-y-6 text-sm text-slate-300">
+              <audio
+                key={`${selectedRecording.id}:${selectedRecording.updatedAt}`}
+                controls
+                src={audioSrc ?? undefined}
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950/60 p-3"
+              >
+                Your browser does not support audio playback.
+              </audio>
+              <div className="space-y-2 text-xs text-slate-400">
+                <div>
+                  <span className="font-semibold text-slate-300">Recorded:</span>{' '}
+                  {formatDate(selectedRecording.recordedAt ?? selectedRecording.createdAt)}
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-300">Duration:</span>{' '}
+                  {formatDuration(selectedRecording.durationMs)}
+                </div>
+                {selectedRecording.description ? (
+                  <p className="text-slate-300">{selectedRecording.description}</p>
+                ) : null}
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button className="flex h-12 w-12 items-center justify-center rounded-full bg-brand text-slate-950 font-semibold">
-                ▶
-              </button>
-              <span className="text-sm text-slate-300">00:00 / 00:00</span>
+          ) : (
+            <div className="mt-10 flex flex-col items-center justify-center gap-4 text-slate-500">
+              <div className="flex h-32 w-full items-center justify-center rounded-2xl border border-dashed border-slate-700">
+                Select a recording to preview and play it here.
+              </div>
             </div>
-          </div>
+          )}
         </section>
       </div>
     </div>

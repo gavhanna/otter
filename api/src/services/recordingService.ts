@@ -54,6 +54,13 @@ export type AudioUpload = {
   stream: NodeJS.ReadableStream;
 };
 
+export type RecordingAsset = {
+  recordingId: string;
+  storagePath: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
 export async function listRecordings(
   db: BetterSQLite3Database,
   viewer: PublicUser,
@@ -178,6 +185,31 @@ export async function ensureRecordingAccess(
   recordingId: string
 ): Promise<RecordingSummary | null> {
   return getRecordingForViewer(db, viewer, recordingId);
+}
+
+export async function getPrimaryAssetForViewer(
+  db: BetterSQLite3Database,
+  viewer: PublicUser,
+  recordingId: string
+): Promise<RecordingAsset | null> {
+  const recording = await ensureRecordingAccess(db, viewer, recordingId);
+  if (!recording) {
+    return null;
+  }
+
+  const assets = await db
+    .select({
+      recordingId: recordingAssets.recordingId,
+      storagePath: recordingAssets.storagePath,
+      contentType: recordingAssets.contentType,
+      sizeBytes: recordingAssets.sizeBytes
+    })
+    .from(recordingAssets)
+    .where(eq(recordingAssets.recordingId, recordingId))
+    .orderBy(desc(recordingAssets.createdAt))
+    .limit(1);
+
+  return assets[0] ?? null;
 }
 
 type RecordingInsertValues = {
