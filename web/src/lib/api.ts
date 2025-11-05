@@ -64,6 +64,10 @@ export const api = {
     request<{ recording: RecordingSummary }>('api/recordings', {
       method: 'POST',
       body: formData
+    }),
+  getRecording: (id: string) =>
+    request<{ recording: RecordingSummary }>(`api/recordings/${id}`, {
+      method: 'GET'
     })
 };
 

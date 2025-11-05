@@ -11,6 +11,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import { AppShell } from './components/AppShell';
 import { RecordingsPage } from './pages/RecordingsPage';
+import { RecentPage } from './pages/RecentPage';
+import { FavoritesPage } from './pages/FavoritesPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthProvider } from './lib/authStore';
 
@@ -34,7 +36,19 @@ const recordingsRoute = createRoute({
   component: RecordingsPage
 });
 
-const routeTree = rootRoute.addChildren([loginRoute, recordingsRoute]);
+const recentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/recent',
+  component: RecentPage
+});
+
+const favoritesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/favorites',
+  component: FavoritesPage
+});
+
+const routeTree = rootRoute.addChildren([loginRoute, recordingsRoute, recentRoute, favoritesRoute]);
 
 const router = createRouter({
   routeTree
