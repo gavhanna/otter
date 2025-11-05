@@ -1,10 +1,11 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { RecorderPanel } from '../components/RecorderPanel';
+import { useRecording } from '../components/AppShell';
 import { useAuth } from '../lib/authStore';
 
 export function RecentPage() {
   const { status } = useAuth();
+  const { setRecordingMode } = useRecording();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,6 +17,10 @@ export function RecentPage() {
   if (status !== 'authenticated') {
     return null;
   }
+
+  const handleNewRecording = () => {
+    setRecordingMode(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -30,7 +35,15 @@ export function RecentPage() {
           View your recordings from the last 7 days. Select any recording from the sidebar to see details.
         </p>
 
-        <RecorderPanel />
+        <button
+          onClick={handleNewRecording}
+          className="rounded-full bg-brand text-slate-950 hover:bg-orange-400 px-8 py-3 text-sm font-semibold transition-colors shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+          </svg>
+          New Recording
+        </button>
 
         <div className="mt-8 text-sm text-slate-500">
           <p>• Recent recordings are shown in the sidebar by default</p>
