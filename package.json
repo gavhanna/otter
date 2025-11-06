@@ -1,23 +1,26 @@
 {
-  "name": "otter",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "workspaces": [
-    "api",
-    "web"
-  ],
-  "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
-    "lint": "npm run lint --if-present --workspaces",
-    "format": "npm run format --if-present --workspaces",
-    "test": "npm run test --if-present --workspaces"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "dependencies": {
-    "@fastify/jwt": "^10.0.0"
-  }
+    "name": "otter",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "api",
+        "web"
+    ],
+    "scripts": {
+        "build": "npm run build --workspaces",
+        "dev": "concurrently \"npm run dev --workspace=api\" \"npm run dev --workspace=web\"",
+        "lint": "npm run lint --if-present --workspaces",
+        "format": "npm run format --if-present --workspaces",
+        "test": "npm run test --if-present --workspaces"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    },
+    "dependencies": {
+        "@fastify/jwt": "^10.0.0"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
 }

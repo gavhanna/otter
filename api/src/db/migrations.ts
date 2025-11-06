@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS recordings (
   recorded_at INTEGER DEFAULT (unixepoch()),
   is_favourited INTEGER NOT NULL DEFAULT 0,
   transcript_status TEXT,
+  location TEXT,
+  location_latitude TEXT,
+  location_longitude TEXT,
+  location_source TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
@@ -76,6 +80,25 @@ export function runMigrations(sqlite: SQLiteDatabase): void {
 
     // Update any NULL values to 0
     sqlite.prepare('UPDATE recordings SET is_favourited = 0 WHERE is_favourited IS NULL').run();
+
+    // Add location columns if they don't exist
+    const locationColumns = [
+      'location',
+      'location_latitude',
+      'location_longitude',
+      'location_source'
+    ];
+
+    for (const column of locationColumns) {
+      try {
+        sqlite.exec(`ALTER TABLE recordings ADD COLUMN ${column} TEXT`);
+      } catch (error: any) {
+        // Column already exists, ignore error
+        if (!error.message.includes('duplicate column name')) {
+          throw error;
+        }
+      }
+    }
 
     sqlite
       .prepare(

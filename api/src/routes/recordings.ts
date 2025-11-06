@@ -103,6 +103,25 @@ export async function registerRecordingRoutes(
                     ? fields.recordedAt
                     : null;
 
+            // Extract location fields from form data
+            const location =
+                fields.location && fields.location.trim().length > 0
+                    ? fields.location.trim()
+                    : null;
+            const locationLatitude = fields.locationLatitude
+                ? Number(fields.locationLatitude)
+                : undefined;
+            const locationLongitude = fields.locationLongitude
+                ? Number(fields.locationLongitude)
+                : undefined;
+            const locationSource = fields.locationSource as 'ip' | 'manual' | 'geolocation' | undefined;
+
+            // Get client IP for automatic location detection
+            const clientIp = request.headers['x-forwarded-for'] as string ||
+                request.headers['x-real-ip'] as string ||
+                request.ip ||
+                undefined;
+
             try {
                 const recording = await createRecordingWithFile(
                     app.db,
@@ -113,12 +132,17 @@ export async function registerRecordingRoutes(
                         description,
                         durationMs,
                         recordedAt,
+                        location,
+                        locationLatitude,
+                        locationLongitude,
+                        locationSource,
                     },
                     {
                         filename: audioPart.filename,
                         mimetype: audioPart.mimetype,
                         stream: audioPart.file,
-                    }
+                    },
+                    clientIp
                 );
 
                 return reply.status(201).send({ recording });
@@ -230,19 +254,54 @@ export async function registerRecordingRoutes(
                     .send({ message: "Recording id is required" });
             }
 
-            const body = request.body as { title?: string; description?: string | null } | undefined;
-            if (!body || (body.title === undefined && body.description === undefined)) {
+            const body = request.body as {
+                title?: string;
+                description?: string | null;
+                location?: string | null;
+                locationLatitude?: number | null;
+                locationLongitude?: number | null;
+                locationSource?: 'manual' | 'geolocation' | null;
+            } | undefined;
+
+            if (!body || (
+                body.title === undefined &&
+                body.description === undefined &&
+                body.location === undefined &&
+                body.locationLatitude === undefined &&
+                body.locationLongitude === undefined &&
+                body.locationSource === undefined
+            )) {
                 return reply
                     .status(400)
-                    .send({ message: "At least one field (title or description) must be provided" });
+                    .send({ message: "At least one field must be provided for update" });
             }
 
-            const updates: { title?: string; description?: string | null } = {};
+            const updates: {
+                title?: string;
+                description?: string | null;
+                location?: string | null;
+                locationLatitude?: number | null;
+                locationLongitude?: number | null;
+                locationSource?: 'manual' | 'geolocation' | null;
+            } = {};
+
             if (body.title !== undefined) {
                 updates.title = body.title;
             }
             if (body.description !== undefined) {
                 updates.description = body.description;
+            }
+            if (body.location !== undefined) {
+                updates.location = body.location;
+            }
+            if (body.locationLatitude !== undefined) {
+                updates.locationLatitude = body.locationLatitude;
+            }
+            if (body.locationLongitude !== undefined) {
+                updates.locationLongitude = body.locationLongitude;
+            }
+            if (body.locationSource !== undefined) {
+                updates.locationSource = body.locationSource;
             }
 
             try {

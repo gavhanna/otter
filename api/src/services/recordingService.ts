@@ -9,6 +9,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { recordingAssets, recordings, users } from "../db/schema.js";
 import type { PublicUser } from "./userService.js";
 import { formatDefaultRecordingName } from "../utils/dateUtils.js";
+import { getLocationFromIp, formatLocation, isLocalDevelopment, getLocalDevelopmentLocation, type LocationData } from "./locationService.js";
 
 type RecordingRow = {
     id: string;
@@ -22,6 +23,10 @@ type RecordingRow = {
     ownerEmail: string | null;
     ownerDisplayName: string | null;
     isFavourited: boolean | null;
+    location: string | null;
+    locationLatitude: string | null;
+    locationLongitude: string | null;
+    locationSource: string | null;
     // Asset fields from JOIN (nullable)
     assetStoragePath: string | null;
     assetContentType: string | null;
@@ -44,6 +49,10 @@ export type RecordingSummary = {
     createdAt: string;
     updatedAt: string;
     isFavourited: boolean;
+    location: string | null;
+    locationLatitude: number | null;
+    locationLongitude: number | null;
+    locationSource: 'ip' | 'manual' | 'geolocation' | null;
     owner: {
         id: string;
         email: string;
@@ -60,6 +69,10 @@ export type CreateRecordingInput = {
     description?: string | null;
     durationMs?: number | null;
     recordedAt?: string | number | Date | null;
+    location?: string | null;
+    locationLatitude?: number | null;
+    locationLongitude?: number | null;
+    locationSource?: 'ip' | 'manual' | 'geolocation' | null;
 };
 
 export type RecordingListFilters = {
@@ -94,6 +107,10 @@ export async function listRecordings(
             createdAt: recordings.createdAt,
             updatedAt: recordings.updatedAt,
             isFavourited: recordings.isFavourited,
+            location: recordings.location,
+            locationLatitude: recordings.locationLatitude,
+            locationLongitude: recordings.locationLongitude,
+            locationSource: recordings.locationSource,
             ownerId: recordings.ownerId,
             ownerEmail: users.email,
             ownerDisplayName: users.displayName,
@@ -120,11 +137,12 @@ export async function listRecordings(
 export async function createRecording(
     db: BetterSQLite3Database,
     owner: PublicUser,
-    input: CreateRecordingInput
+    input: CreateRecordingInput,
+    clientIp?: string
 ): Promise<RecordingSummary> {
     const recordingId = await insertRecording(
         db,
-        prepareRecordingValues(owner, input)
+        await prepareRecordingValues(owner, input, clientIp)
     );
     const recording = await getRecordingForViewer(db, owner, recordingId);
     if (!recording) {
@@ -138,9 +156,10 @@ export async function createRecordingWithFile(
     owner: PublicUser,
     storageDir: string,
     input: CreateRecordingInput,
-    audio: AudioUpload
+    audio: AudioUpload,
+    clientIp?: string
 ): Promise<RecordingSummary> {
-    const values = prepareRecordingValues(owner, input);
+    const values = await prepareRecordingValues(owner, input, clientIp);
     const recordingId = await insertRecording(db, values);
 
     let stored: PersistedRecordingFile | null = null;
@@ -191,6 +210,10 @@ export async function getRecordingForViewer(
             createdAt: recordings.createdAt,
             updatedAt: recordings.updatedAt,
             isFavourited: recordings.isFavourited,
+            location: recordings.location,
+            locationLatitude: recordings.locationLatitude,
+            locationLongitude: recordings.locationLongitude,
+            locationSource: recordings.locationSource,
             ownerId: recordings.ownerId,
             // User fields
             ownerEmail: users.email,
@@ -288,6 +311,10 @@ type RecordingInsertValues = {
     description: string | null;
     durationMs: number;
     recordedAt: Date;
+    location: string | null;
+    locationLatitude: string | null;
+    locationLongitude: string | null;
+    locationSource: 'ip' | 'manual' | 'geolocation' | null;
 };
 
 type PersistedRecordingFile = {
@@ -312,10 +339,11 @@ async function insertRecording(
     return inserted.id;
 }
 
-function prepareRecordingValues(
+async function prepareRecordingValues(
     owner: PublicUser,
-    input: CreateRecordingInput
-): RecordingInsertValues {
+    input: CreateRecordingInput,
+    clientIp?: string
+): Promise<RecordingInsertValues> {
     let title = (input.title ?? "").trim();
     if (title.length === 0) {
         // Use default naming format if no title provided
@@ -326,12 +354,48 @@ function prepareRecordingValues(
     const durationMs = normalizeDuration(input.durationMs);
     const recordedAt = parseRecordedAt(input.recordedAt) ?? new Date();
 
+    // Handle location data
+    let location = input.location || null;
+    let locationLatitude = input.locationLatitude ? input.locationLatitude.toString() : null;
+    let locationLongitude = input.locationLongitude ? input.locationLongitude.toString() : null;
+    let locationSource = input.locationSource || null;
+
+    // If no location provided, try to get it from IP
+    if (!location && clientIp) {
+        try {
+            // Check if we're in local development
+            if (isLocalDevelopment({ ip: clientIp })) {
+                const localLocation = await getLocalDevelopmentLocation();
+                if (localLocation) {
+                    location = formatLocation(localLocation);
+                    locationLatitude = localLocation.latitude?.toString() || null;
+                    locationLongitude = localLocation.longitude?.toString() || null;
+                    locationSource = 'manual'; // Mark as manual since it's a fallback
+                }
+            } else {
+                const locationData = await getLocationFromIp(clientIp);
+                if (locationData) {
+                    location = formatLocation(locationData);
+                    locationLatitude = locationData.latitude?.toString() || null;
+                    locationLongitude = locationData.longitude?.toString() || null;
+                    locationSource = 'ip';
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to get location from IP:', error);
+        }
+    }
+
     return {
         ownerId: owner.id,
         title,
         description,
         durationMs,
         recordedAt,
+        location,
+        locationLatitude,
+        locationLongitude,
+        locationSource,
     };
 }
 
@@ -440,6 +504,10 @@ export async function updateRecordingFavourite(
             createdAt: recordings.createdAt,
             updatedAt: recordings.updatedAt,
             isFavourited: recordings.isFavourited,
+            location: recordings.location,
+            locationLatitude: recordings.locationLatitude,
+            locationLongitude: recordings.locationLongitude,
+            locationSource: recordings.locationSource,
             ownerId: recordings.ownerId,
         });
 
@@ -474,6 +542,10 @@ export async function updateRecordingFavourite(
         createdAt: toIsoString(updated.createdAt) ?? new Date().toISOString(),
         updatedAt: toIsoString(updated.updatedAt) ?? new Date().toISOString(),
         isFavourited: Boolean(updated.isFavourited),
+        location: updated.location ?? null,
+        locationLatitude: updated.locationLatitude ? parseFloat(updated.locationLatitude) : null,
+        locationLongitude: updated.locationLongitude ? parseFloat(updated.locationLongitude) : null,
+        locationSource: updated.locationSource as 'ip' | 'manual' | 'geolocation' | null,
         owner,
         asset: null, // We don't need to fetch asset for these updates
     };
@@ -483,7 +555,14 @@ export async function updateRecordingMetadata(
     db: BetterSQLite3Database,
     viewer: PublicUser,
     recordingId: string,
-    updates: { title?: string; description?: string | null }
+    updates: {
+        title?: string;
+        description?: string | null;
+        location?: string | null;
+        locationLatitude?: number | null;
+        locationLongitude?: number | null;
+        locationSource?: 'manual' | 'geolocation' | null;
+    }
 ): Promise<RecordingSummary | null> {
     // First verify access
     const recording = await getRecordingForViewer(db, viewer, recordingId);
@@ -505,6 +584,22 @@ export async function updateRecordingMetadata(
         updateData.description = updates.description && updates.description.trim() ? updates.description.trim() : null;
     }
 
+    if (updates.location !== undefined) {
+        updateData.location = updates.location && updates.location.trim() ? updates.location.trim() : null;
+    }
+
+    if (updates.locationLatitude !== undefined) {
+        updateData.locationLatitude = updates.locationLatitude?.toString() || null;
+    }
+
+    if (updates.locationLongitude !== undefined) {
+        updateData.locationLongitude = updates.locationLongitude?.toString() || null;
+    }
+
+    if (updates.locationSource !== undefined) {
+        updateData.locationSource = updates.locationSource;
+    }
+
     // Update the recording metadata
     const [updated] = await db
         .update(recordings)
@@ -519,6 +614,10 @@ export async function updateRecordingMetadata(
             createdAt: recordings.createdAt,
             updatedAt: recordings.updatedAt,
             isFavourited: recordings.isFavourited,
+            location: recordings.location,
+            locationLatitude: recordings.locationLatitude,
+            locationLongitude: recordings.locationLongitude,
+            locationSource: recordings.locationSource,
             ownerId: recordings.ownerId,
         });
 
@@ -553,6 +652,10 @@ export async function updateRecordingMetadata(
         createdAt: toIsoString(updated.createdAt) ?? new Date().toISOString(),
         updatedAt: toIsoString(updated.updatedAt) ?? new Date().toISOString(),
         isFavourited: Boolean(updated.isFavourited),
+        location: updated.location ?? null,
+        locationLatitude: updated.locationLatitude ? parseFloat(updated.locationLatitude) : null,
+        locationLongitude: updated.locationLongitude ? parseFloat(updated.locationLongitude) : null,
+        locationSource: updated.locationSource as 'ip' | 'manual' | 'geolocation' | null,
         owner,
         asset: null, // We don't need to fetch asset for these updates
     };
@@ -625,6 +728,10 @@ function mapRowToSummary(row: RecordingRow, asset?: RecordingAsset | null): Reco
         createdAt: toIsoString(row.createdAt) ?? new Date().toISOString(),
         updatedAt: toIsoString(row.updatedAt) ?? new Date().toISOString(),
         isFavourited: Boolean(row.isFavourited),
+        location: row.location ?? null,
+        locationLatitude: row.locationLatitude ? parseFloat(row.locationLatitude) : null,
+        locationLongitude: row.locationLongitude ? parseFloat(row.locationLongitude) : null,
+        locationSource: row.locationSource as 'ip' | 'manual' | 'geolocation' | null,
         owner,
         asset: asset ? {
             sizeBytes: asset.sizeBytes,

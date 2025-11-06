@@ -74,7 +74,14 @@ export const api = {
       method: 'PATCH',
       json: { isFavourited }
     }),
-  updateRecording: (id: string, updates: { title?: string; description?: string | null }) =>
+  updateRecording: (id: string, updates: {
+        title?: string;
+        description?: string | null;
+        location?: string | null;
+        locationLatitude?: number | null;
+        locationLongitude?: number | null;
+        locationSource?: 'manual' | 'geolocation' | null;
+    }) =>
     request<{ recording: RecordingSummary }>(`api/recordings/${id}`, {
       method: 'PATCH',
       json: updates
@@ -105,6 +112,10 @@ export type RecordingSummary = {
   createdAt: string;
   updatedAt: string;
   isFavourited: boolean;
+  location: string | null;
+  locationLatitude: number | null;
+  locationLongitude: number | null;
+  locationSource: 'ip' | 'manual' | 'geolocation' | null;
   owner: {
     id: string;
     email: string;

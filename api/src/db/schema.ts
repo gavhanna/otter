@@ -23,6 +23,10 @@ export const recordings = sqliteTable('recordings', {
   recordedAt: integer('recorded_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
   isFavourited: integer('is_favourited', { mode: 'boolean' }).notNull().default(false),
   transcriptStatus: text('transcript_status'),
+  location: text('location'),
+  locationLatitude: text('location_latitude'),
+  locationLongitude: text('location_longitude'),
+  locationSource: text('location_source', { enum: ['ip', 'manual', 'geolocation'] }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
 });

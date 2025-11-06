@@ -21,6 +21,8 @@ export function RecordingView({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitle, setEditTitle] = useState("");
     const [isUpdating, setIsUpdating] = useState(false);
+    const [isEditingLocation, setIsEditingLocation] = useState(false);
+    const [editLocation, setEditLocation] = useState("");
     const waveformRef = useRef<HTMLDivElement>(null);
     const wavesurferRef = useRef<WaveSurfer | null>(null);
     const queryClient = useQueryClient();
@@ -260,6 +262,114 @@ export function RecordingView({
             handleSaveTitle();
         } else if (e.key === "Escape") {
             handleCancelEditTitle();
+        }
+    };
+
+    // Handle location editing
+    const handleStartEditLocation = () => {
+        if (!recording) return;
+        setEditLocation(recording.location || "");
+        setIsEditingLocation(true);
+    };
+
+    const handleSaveLocation = async () => {
+        if (!recording || !recordingId) return;
+
+        const trimmedLocation = editLocation.trim();
+        if (trimmedLocation === recording.location) {
+            setIsEditingLocation(false);
+            return;
+        }
+
+        setIsUpdating(true);
+
+        // Create a stable copy to avoid triggering unnecessary re-renders
+        const originalRecording = { ...recording };
+
+        // Optimistic update
+        queryClient.setQueryData(["recording", recordingId], (oldData: any) => {
+            if (!oldData?.recording) return oldData;
+            return {
+                ...oldData,
+                recording: {
+                    ...oldData.recording,
+                    location: trimmedLocation || null,
+                    locationSource: trimmedLocation ? 'manual' : null
+                },
+            };
+        });
+
+        // Update the recording in the list cache
+        queryClient.setQueryData(["recordings"], (oldData: any) => {
+            if (!oldData?.recordings) return oldData;
+            return {
+                ...oldData,
+                recordings: oldData.recordings.map((r: any) =>
+                    r.id === recording.id
+                        ? {
+                            ...r,
+                            location: trimmedLocation || null,
+                            locationSource: trimmedLocation ? 'manual' : null
+                        }
+                        : r
+                ),
+            };
+        });
+
+        try {
+            await api.updateRecording(recording.id, {
+                location: trimmedLocation || null,
+                locationSource: trimmedLocation ? 'manual' : null
+            });
+            setIsEditingLocation(false);
+
+            // Invalidate queries to ensure UI is up to date
+            queryClient.invalidateQueries({ queryKey: ["recordings"] });
+            queryClient.invalidateQueries({
+                queryKey: ["recording", recordingId],
+            });
+        } catch (error) {
+            console.error("Failed to update recording location:", error);
+
+            // Revert on error
+            queryClient.setQueryData(
+                ["recording", recordingId],
+                (oldData: any) => {
+                    if (!oldData?.recording) return oldData;
+                    return {
+                        ...oldData,
+                        recording: originalRecording,
+                    };
+                }
+            );
+
+            queryClient.setQueryData(["recordings"], (oldData: any) => {
+                if (!oldData?.recordings) return oldData;
+                return {
+                    ...oldData,
+                    recordings: oldData.recordings.map((r: any) =>
+                        r.id === recording.id ? originalRecording : r
+                    ),
+                };
+            });
+
+            setEditLocation(recording.location || ""); // Reset input
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleCancelEditLocation = () => {
+        if (!recording) return;
+        setEditLocation(recording.location || "");
+        setIsEditingLocation(false);
+    };
+
+    const handleLocationKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+            handleSaveLocation();
+        } else if (e.key === "Escape") {
+            handleCancelEditLocation();
         }
     };
 
@@ -726,7 +836,7 @@ export function RecordingView({
                         <h2 className="text-lg font-semibold text-white mb-4">
                             Recording Details
                         </h2>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div>
                                 <span className="text-slate-400">
                                     Recorded:
@@ -765,6 +875,75 @@ export function RecordingView({
                                         : "Unknown"
                                     }
                                 </p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <span className="text-slate-400">Location:</span>
+                                {isEditingLocation ? (
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                            type="text"
+                                            value={editLocation}
+                                            onChange={(e) =>
+                                                setEditLocation(e.target.value)
+                                            }
+                                            onKeyDown={handleLocationKeyDown}
+                                            disabled={isUpdating}
+                                            className="text-white bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 focus:outline-none focus:border-brand flex-1 min-w-0"
+                                            placeholder="Enter location..."
+                                            autoFocus
+                                        />
+                                        <button
+                                            onClick={handleSaveLocation}
+                                            disabled={isUpdating}
+                                            className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-3 py-1 text-sm hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {isUpdating ? (
+                                                <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin"></div>
+                                            ) : (
+                                                "Save"
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={handleCancelEditLocation}
+                                            disabled={isUpdating}
+                                            className="rounded-lg border border-slate-700 text-slate-300 px-3 py-1 text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-white">
+                                            {recording.location || (
+                                                <span className="text-slate-500 italic">No location set</span>
+                                            )}
+                                            {recording.locationSource && (
+                                                <span className="text-slate-500 text-xs ml-2">
+                                                    ({recording.locationSource === 'ip' ? 'auto-detected' : 'manual'})
+                                                </span>
+                                            )}
+                                        </p>
+                                        <button
+                                            onClick={handleStartEditLocation}
+                                            className="rounded-lg border border-slate-700 text-slate-400 p-1 hover:bg-slate-800 hover:text-slate-300 transition-colors"
+                                            title="Edit location"
+                                        >
+                                            <svg
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         {recording.description && (
