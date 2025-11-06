@@ -188,31 +188,16 @@ export function RecordingView({
 
         setIsUpdating(true);
 
-        // Create a stable copy to avoid triggering unnecessary re-renders
-        const originalRecording = { ...recording };
-
-        // Optimistic update
-        queryClient.setQueryData(["recording", recordingId], (oldData: any) => {
-            if (!oldData?.recording) return oldData;
-            return {
-                ...oldData,
-                recording: { ...oldData.recording, title: trimmedTitle },
-            };
-        });
-
-        // Update the recording in the list cache
-        queryClient.setQueryData(["recordings"], (oldData: any) => {
-            if (!oldData?.recordings) return oldData;
-            return {
-                ...oldData,
-                recordings: oldData.recordings.map((r: any) =>
-                    r.id === recording.id ? { ...r, title: trimmedTitle } : r
-                ),
-            };
-        });
-
         try {
-            await api.updateRecording(recording.id, { title: trimmedTitle });
+            // Call API first to ensure the update works
+            await Promise.race([
+                api.updateRecording(recording.id, { title: trimmedTitle }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Title update timeout - please try again')), 45000)
+                )
+            ]);
+
+            // Success - now update local state
             setIsEditingTitle(false);
 
             // Invalidate queries to ensure UI is up to date
@@ -220,32 +205,16 @@ export function RecordingView({
             queryClient.invalidateQueries({
                 queryKey: ["recording", recordingId],
             });
+
         } catch (error) {
             console.error("Failed to update recording title:", error);
 
-            // Revert on error
-            queryClient.setQueryData(
-                ["recording", recordingId],
-                (oldData: any) => {
-                    if (!oldData?.recording) return oldData;
-                    return {
-                        ...oldData,
-                        recording: originalRecording,
-                    };
-                }
-            );
+            // Don't change state on error - keep editing mode active
+            // User can try again or cancel manually
+            setEditTitle(recording.title); // Reset to original title
 
-            queryClient.setQueryData(["recordings"], (oldData: any) => {
-                if (!oldData?.recordings) return oldData;
-                return {
-                    ...oldData,
-                    recordings: oldData.recordings.map((r: any) =>
-                        r.id === recording.id ? originalRecording : r
-                    ),
-                };
-            });
-
-            setEditTitle(recording.title); // Reset input
+            // Show error message
+            alert(`Failed to save title: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             setIsUpdating(false);
         }
@@ -387,20 +356,22 @@ export function RecordingView({
         // Create new WaveSurfer instance
         const wavesurfer = WaveSurfer.create({
             container: waveformRef.current,
-            waveColor: "#64748b", // slate-500
-            progressColor: "#fb923c", // brand (orange)
-            cursorColor: "#f8fafc", // slate-50
-            barWidth: 2,
-            barRadius: 3,
-            cursorWidth: 1,
-            height: 80,
-            barGap: 3,
+            waveColor: "#475569", // slate-600 - more subtle
+            progressColor: "transparent", // hide built-in progress since we have custom one
+            cursorColor: "#ffffff", // white - more visible
+            barWidth: 3, // slightly thicker bars
+            barRadius: 2,
+            cursorWidth: 2, // more prominent cursor
+            height: "auto", // let it fill container
+            barGap: 2,
             normalize: true,
             backend: "WebAudio",
             mediaControls: false,
             interact: true,
             hideScrollbar: true,
             autoScroll: false,
+            fillParent: true, // fill container
+            dragToSeek: true, // enable drag to seek
         });
 
         // Event listeners
@@ -428,6 +399,12 @@ export function RecordingView({
 
         wavesurfer.on("error", (error) => {
             console.error("WaveSurfer error:", error);
+            console.error("Audio source:", audioSrc);
+            console.error("Error details:", {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
             setIsWaveformReady(false);
         });
 
@@ -519,8 +496,8 @@ export function RecordingView({
     }
 
     return (
-        <div className="flex-1 flex flex-col">
-            <header className="border-b border-slate-800 bg-slate-900/80 px-6 py-4">
+        <div className="flex-1 flex flex-col h-full">
+            <header className="border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-sm px-8 py-4">
                 <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                         {isEditingTitle ? (
@@ -660,303 +637,264 @@ export function RecordingView({
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto">
-                <div className="max-w-4xl mx-auto p-6 space-y-8">
-                    {/* Waveform and Audio Player */}
-                    <section className="bg-slate-900/70 rounded-2xl border border-slate-800 p-6">
-                        <h2 className="text-lg font-semibold text-white mb-4">
-                            Audio Player
-                        </h2>
-
-                        {/* Waveform */}
-                        <div className="mb-4">
-                            <div
-                                ref={waveformRef}
-                                className="rounded-xl bg-slate-950/60 min-h-[80px] flex items-center justify-center"
-                            >
-                                {!isWaveformReady && audioSrc && (
-                                    <div className="flex items-center gap-3 text-slate-500">
-                                        <div className="w-4 h-4 border-2 border-slate-600 border-t-brand rounded-full animate-spin"></div>
-                                        <span className="text-sm">
-                                            Loading waveform...
-                                        </span>
-                                    </div>
-                                )}
-                                {!audioSrc && (
-                                    <p className="text-slate-500">
-                                        No audio available
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Playback Controls */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => {
-                                        if (wavesurferRef.current) {
-                                            if (isPlaying) {
-                                                wavesurferRef.current.pause();
-                                            } else {
-                                                wavesurferRef.current.play();
-                                            }
-                                        }
-                                    }}
-                                    disabled={!isWaveformReady}
-                                    className="w-12 h-12 rounded-full bg-brand text-slate-950 flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {isPlaying ? (
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                                        </svg>
-                                    ) : (
-                                        <svg
-                                            className="w-5 h-5 ml-1"
-                                            fill="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path d="M8 5v14l11-7z" />
-                                        </svg>
-                                    )}
-                                </button>
-
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                                        <span>{formatTime(currentTime)}</span>
-                                        <span>
-                                            {formatTime(
-                                                recording?.durationMs
-                                                    ? recording.durationMs /
-                                                          1000
-                                                    : 0
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="h-1 bg-slate-800 rounded-full">
-                                        <div
-                                            className="h-1 bg-brand rounded-full transition-all duration-100"
-                                            style={{
-                                                width: `${
-                                                    recording?.durationMs
-                                                        ? (currentTime /
-                                                              (recording.durationMs /
-                                                                  1000)) *
-                                                          100
-                                                        : 0
-                                                }%`,
-                                            }}
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <svg
-                                        className="w-4 h-4 text-slate-400"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                                        />
-                                    </svg>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="1"
-                                        step="0.01"
-                                        value={volume}
-                                        onChange={(e) => {
-                                            const newVolume = parseFloat(
-                                                e.target.value
-                                            );
-                                            setVolume(newVolume);
-                                            if (wavesurferRef.current) {
-                                                wavesurferRef.current.setVolume(
-                                                    newVolume
-                                                );
-                                            }
-                                        }}
-                                        className="w-20 accent-brand"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Transcript */}
-                    <section className="bg-slate-900/70 rounded-2xl border border-slate-800 p-6">
-                        <h2 className="text-lg font-semibold text-white mb-4">
-                            Transcript
-                        </h2>
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
-                                <div className="flex items-center gap-3">
-                                    <button className="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
-                                        <svg
-                                            className="w-4 h-4 text-white"
-                                            fill="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path d="M8 5v14l11-7z" />
-                                        </svg>
-                                    </button>
-                                    <span className="text-sm text-slate-300">
-                                        00:00 - 00:15
+            <div className="flex-1 flex flex-col h-full">
+                {/* Google Recorder Style Full Height Layout */}
+                <div className="flex-1 flex flex-col bg-slate-900/30 relative">
+                    {/* Main Waveform Area - Takes up most of the space */}
+                    <div className="flex-1 relative bg-slate-950/60 overflow-hidden">
+                        {/* Waveform Display */}
+                        <div
+                            ref={waveformRef}
+                            className="w-full h-full flex items-center justify-center cursor-pointer"
+                            onClick={() => {
+                                if (wavesurferRef.current && isWaveformReady) {
+                                    if (isPlaying) {
+                                        wavesurferRef.current.pause();
+                                    } else {
+                                        wavesurferRef.current.play();
+                                    }
+                                }
+                            }}
+                        >
+                            {!isWaveformReady && audioSrc && (
+                                <div className="flex items-center gap-3 text-slate-500">
+                                    <div className="w-4 h-4 border-2 border-slate-600 border-t-brand rounded-full animate-spin"></div>
+                                    <span className="text-sm">
+                                        Loading waveform...
                                     </span>
                                 </div>
-                            </div>
-                            <div className="text-slate-300 leading-relaxed">
-                                <p className="mb-4">
-                                    Hello, this is a sample transcript. The
-                                    actual transcription feature will be
-                                    implemented in a future update. This will
-                                    show the spoken content from your recording
-                                    with timestamps.
+                            )}
+                            {!audioSrc && (
+                                <p className="text-slate-500">
+                                    No audio available
                                 </p>
-                                <p>
-                                    Each segment will be clickable and will
-                                    allow you to jump to that specific part of
-                                    the audio recording.
-                                </p>
-                            </div>
+                            )}
                         </div>
-                    </section>
 
-                    {/* Metadata */}
-                    <section className="bg-slate-900/70 rounded-2xl border border-slate-800 p-6">
-                        <h2 className="text-lg font-semibold text-white mb-4">
-                            Recording Details
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span className="text-slate-400">
-                                    Recorded:
-                                </span>
-                                <p className="text-white mt-1">
-                                    {formatDate(
-                                        recording.recordedAt ??
-                                            recording.createdAt
-                                    )}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-slate-400">
-                                    Duration:
-                                </span>
-                                <p className="text-white mt-1">
-                                    {formatDuration(recording.durationMs)}
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-slate-400">
-                                    File Size:
-                                </span>
-                                <p className="text-white mt-1">
-                                    {recording.asset?.sizeBytes
-                                        ? formatFileSize(recording.asset.sizeBytes)
-                                        : "Unknown"
+                        {/* Overlay Play/Pause Button */}
+                        {audioSrc && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (wavesurferRef.current) {
+                                        if (isPlaying) {
+                                            wavesurferRef.current.pause();
+                                        } else {
+                                            wavesurferRef.current.play();
+                                        }
                                     }
-                                </p>
-                            </div>
-                            <div>
-                                <span className="text-slate-400">Format:</span>
-                                <p className="text-white mt-1">
-                                    {recording.asset?.contentType
-                                        ? getFormatName(recording.asset.contentType)
-                                        : "Unknown"
-                                    }
-                                </p>
-                            </div>
-                            <div className="md:col-span-2">
-                                <span className="text-slate-400">Location:</span>
-                                {isEditingLocation ? (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <input
-                                            type="text"
-                                            value={editLocation}
-                                            onChange={(e) =>
-                                                setEditLocation(e.target.value)
-                                            }
-                                            onKeyDown={handleLocationKeyDown}
-                                            disabled={isUpdating}
-                                            className="text-white bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 focus:outline-none focus:border-brand flex-1 min-w-0"
-                                            placeholder="Enter location..."
-                                            autoFocus
-                                        />
-                                        <button
-                                            onClick={handleSaveLocation}
-                                            disabled={isUpdating}
-                                            className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-3 py-1 text-sm hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        >
-                                            {isUpdating ? (
-                                                <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin"></div>
-                                            ) : (
-                                                "Save"
-                                            )}
-                                        </button>
-                                        <button
-                                            onClick={handleCancelEditLocation}
-                                            disabled={isUpdating}
-                                            className="rounded-lg border border-slate-700 text-slate-300 px-3 py-1 text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
+                                }}
+                                disabled={!isWaveformReady}
+                                className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 flex items-center justify-center hover:bg-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl ${
+                                    isPlaying
+                                        ? "opacity-0 group-hover:opacity-100"
+                                        : "opacity-100"
+                                }`}
+                            >
+                                {isPlaying ? (
+                                    <svg
+                                        className="w-8 h-8"
+                                        fill="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                                    </svg>
                                 ) : (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <p className="text-white">
-                                            {recording.location || (
-                                                <span className="text-slate-500 italic">No location set</span>
-                                            )}
-                                            {recording.locationSource && (
-                                                <span className="text-slate-500 text-xs ml-2">
-                                                    ({recording.locationSource === 'ip' ? 'auto-detected' : 'manual'})
-                                                </span>
-                                            )}
-                                        </p>
-                                        <button
-                                            onClick={handleStartEditLocation}
-                                            className="rounded-lg border border-slate-700 text-slate-400 p-1 hover:bg-slate-800 hover:text-slate-300 transition-colors"
-                                            title="Edit location"
-                                        >
-                                            <svg
-                                                className="w-4 h-4"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                            >
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                                />
-                                            </svg>
-                                        </button>
-                                    </div>
+                                    <svg
+                                        className="w-8 h-8 ml-1"
+                                        fill="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
                                 )}
+                            </button>
+                        )}
+
+                        {/* Time Displays - Top corners */}
+                        <div className="absolute top-4 left-4 text-2xl text-white/90 font-semibold">
+                            {formatTime(currentTime)}
+                        </div>
+                        <div className="absolute top-4 right-4 text-2xl text-white/90 font-semibold">
+                            {formatTime(
+                                recording?.durationMs
+                                    ? recording.durationMs / 1000
+                                    : 0
+                            )}
+                        </div>
+
+                        {/* Subtle Volume Control - Top right */}
+                        <div className="absolute top-4 right-32 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <svg
+                                className="w-5 h-5 text-white/70"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                />
+                            </svg>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volume}
+                                onChange={(e) => {
+                                    const newVolume = parseFloat(
+                                        e.target.value
+                                    );
+                                    setVolume(newVolume);
+                                    if (wavesurferRef.current) {
+                                        wavesurferRef.current.setVolume(
+                                            newVolume
+                                        );
+                                    }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-20 h-1 accent-orange-500 cursor-pointer"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Bottom Controls Section */}
+                    <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-4">
+                        {/* Custom Progress Bar */}
+                        <div className="mb-4">
+                            <div
+                                className="relative h-2 bg-slate-700 rounded-full overflow-hidden cursor-pointer group"
+                                onClick={(e) => {
+                                    if (
+                                        wavesurferRef.current &&
+                                        isWaveformReady
+                                    ) {
+                                        const rect =
+                                            e.currentTarget.getBoundingClientRect();
+                                        const percent =
+                                            (e.clientX - rect.left) /
+                                            rect.width;
+                                        wavesurferRef.current.seekTo(percent);
+                                    }
+                                }}
+                            >
+                                {/* Progress Fill */}
+                                <div
+                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full transition-all duration-100"
+                                    style={{
+                                        width: `${
+                                            recording?.durationMs
+                                                ? (currentTime /
+                                                      (recording.durationMs /
+                                                          1000)) *
+                                                  100
+                                                : 0
+                                        }%`,
+                                    }}
+                                />
+                                {/* Progress Handle */}
+                                <div
+                                    className="absolute top-1/2 transform -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                                    style={{
+                                        left: `${
+                                            recording?.durationMs
+                                                ? (currentTime /
+                                                      (recording.durationMs /
+                                                          1000)) *
+                                                  100
+                                                : 0
+                                        }%`,
+                                        marginLeft: "-8px",
+                                    }}
+                                />
                             </div>
                         </div>
-                        {recording.description && (
-                            <div className="mt-4">
-                                <span className="text-slate-400">
-                                    Description:
-                                </span>
-                                <p className="text-white mt-1">
-                                    {recording.description}
-                                </p>
-                            </div>
-                        )}
-                    </section>
+
+                        {/* Media Playback Controls */}
+                        <div className="flex items-center justify-center gap-4">
+                            {/* Skip Backward 5s Button */}
+                            <button
+                                onClick={() => {
+                                    if (wavesurferRef.current && isWaveformReady) {
+                                        const currentTime = wavesurferRef.current.getCurrentTime();
+                                        wavesurferRef.current.seekTo(Math.max(0, currentTime - 5));
+                                    }
+                                }}
+                                disabled={!isWaveformReady}
+                                className="w-12 h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                title="Skip backward 5 seconds"
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
+                                </svg>
+                            </button>
+
+                            {/* Play/Pause Button */}
+                            <button
+                                onClick={() => {
+                                    if (
+                                        wavesurferRef.current &&
+                                        isWaveformReady
+                                    ) {
+                                        if (isPlaying) {
+                                            wavesurferRef.current.pause();
+                                        } else {
+                                            wavesurferRef.current.play();
+                                        }
+                                    }
+                                }}
+                                disabled={!isWaveformReady}
+                                className="w-16 h-16 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105"
+                            >
+                                {isPlaying ? (
+                                    <svg
+                                        className="w-7 h-7"
+                                        fill="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                                    </svg>
+                                ) : (
+                                    <svg
+                                        className="w-7 h-7 ml-1"
+                                        fill="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                )}
+                            </button>
+
+                            {/* Skip Forward 10s Button */}
+                            <button
+                                onClick={() => {
+                                    if (wavesurferRef.current && isWaveformReady) {
+                                        const currentTime = wavesurferRef.current.getCurrentTime();
+                                        const duration = wavesurferRef.current.getDuration();
+                                        wavesurferRef.current.seekTo(Math.min(duration, currentTime + 10));
+                                    }
+                                }}
+                                disabled={!isWaveformReady}
+                                className="w-12 h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                title="Skip forward 10 seconds"
+                            >
+                                <svg
+                                    className="w-5 h-5"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

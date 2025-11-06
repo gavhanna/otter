@@ -11,20 +11,35 @@ async function request<T>(input: string, options: RequestOptions = {}): Promise<
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_BASE}${input}`, {
-    credentials: 'include',
-    ...options,
-    headers,
-    body: options.json !== undefined ? JSON.stringify(options.json) : options.body
+  // Dynamic timeout based on request type
+  const timeoutMs = options.body instanceof FormData &&
+                   options.method === 'POST' && input.includes('recordings') ? 300000 : 30000; // 5 minutes for audio uploads
+
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`Request timeout after ${timeoutMs/1000}s - please try again`)), timeoutMs);
   });
 
-  if (!response.ok) {
-    const errorBody = await safeJson(response);
-    const message = (errorBody as { message?: string })?.message ?? response.statusText;
-    throw new Error(message);
-  }
+  try {
+    const fetchPromise = fetch(`${API_BASE}${input}`, {
+      credentials: 'include',
+      ...options,
+      headers,
+      body: options.json !== undefined ? JSON.stringify(options.json) : options.body
+    });
 
-  return (await safeJson(response)) as T;
+    const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+    if (!response.ok) {
+      const errorBody = await safeJson(response);
+      const message = (errorBody as { message?: string })?.message ?? response.statusText;
+      throw new Error(message);
+    }
+
+    return (await safeJson(response)) as T;
+  } catch (error) {
+    console.error(`API Error: ${input}`, error);
+    throw error;
+  }
 }
 
 async function safeJson(response: Response): Promise<unknown> {

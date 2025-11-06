@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { type FastifyInstance } from "fastify";
 import type { MultipartFile } from "@fastify/multipart";
+import { Readable } from "node:stream";
 import {
     createRecordingWithFile,
     deleteRecording,
@@ -61,26 +62,63 @@ export async function registerRecordingRoutes(
 
             const fields: Record<string, string> = {};
             let audioPart: MultipartFile | null = null;
+            let audioBuffer: Buffer | null = null;
 
-            for await (const part of request.parts()) {
-                if (part.type === "file") {
-                    if (part.fieldname === "audio" && !audioPart) {
-                        audioPart = part;
-                    } else {
-                        part.file.resume();
+            console.log("Starting multipart processing...");
+            const partsStart = Date.now();
+            let partCount = 0;
+
+            try {
+                for await (const part of request.parts()) {
+                    partCount++;
+                    console.log(`Processing part ${partCount}: type=${part.type}, fieldname=${part.fieldname}`);
+
+                    if (part.type === "file") {
+                        if (part.fieldname === "audio" && !audioPart) {
+                            audioPart = part;
+                            console.log(`Found audio file: ${part.filename}`);
+                            // We need to consume the stream to allow multipart processing to continue
+                            // Buffer the chunks to pass to the recording service
+                            const chunks: Buffer[] = [];
+                            let totalSize = 0;
+                            const maxFileSize = 100 * 1024 * 1024; // 100MB limit
+
+                            for await (const chunk of part.file) {
+                                totalSize += chunk.length;
+                                if (totalSize > maxFileSize) {
+                                    throw new Error(`File too large: ${totalSize} bytes (max: ${maxFileSize})`);
+                                }
+                                chunks.push(chunk);
+                            }
+
+                            // Concatenate all chunks into a single buffer
+                            audioBuffer = Buffer.concat(chunks);
+                            console.log(`Audio file buffered: ${totalSize} bytes`);
+                        } else {
+                            console.log(`Skipping file part: ${part.fieldname}`);
+                            // Consume other files to prevent hanging
+                            for await (const chunk of part.file) {
+                                // Just consume the chunk
+                            }
+                        }
+                    } else if (part.type === "field") {
+                        const value = typeof part.value === "string" ? part.value : String(part.value);
+                        fields[part.fieldname] = value;
+                        console.log(`Field ${part.fieldname}: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
                     }
-                } else if (part.type === "field") {
-                    fields[part.fieldname] =
-                        typeof part.value === "string"
-                            ? part.value
-                            : String(part.value);
                 }
+            } catch (error) {
+                console.error("Error in multipart processing loop:", error);
+                throw error;
             }
+
+            const partsDuration = Date.now() - partsStart;
+            console.log(`Multipart processing completed in ${partsDuration}ms, processed ${partCount} parts`);
 
             const title = fields.title?.trim() ?? "";
             // Title is no longer required as we'll generate a default one on the server side
 
-            if (!audioPart) {
+            if (!audioPart || !audioBuffer) {
                 return reply
                     .status(400)
                     .send({ message: "Audio file is required" });
@@ -121,8 +159,23 @@ export async function registerRecordingRoutes(
                 request.headers['x-real-ip'] as string ||
                 request.ip ||
                 undefined;
+            
+            console.log({
+                title,
+                description,
+                durationMs,
+                recordedAt,
+                location,
+                locationLatitude,
+                locationLongitude,
+                locationSource,
+                clientIp,
+            });
 
             try {
+                console.log("Starting createRecordingWithFile call...");
+                const startTime = Date.now();
+
                 const recording = await createRecordingWithFile(
                     app.db,
                     request.authUser,
@@ -140,13 +193,17 @@ export async function registerRecordingRoutes(
                     {
                         filename: audioPart.filename,
                         mimetype: audioPart.mimetype,
-                        stream: audioPart.file,
+                        buffer: audioBuffer
                     },
                     clientIp
                 );
 
+                const duration = Date.now() - startTime;
+                console.log(`createRecordingWithFile completed in ${duration}ms`);
+
                 return reply.status(201).send({ recording });
             } catch (error) {
+                console.error("Failed to create recording:", error);
                 request.log.error(error, "Failed to create recording");
                 return reply
                     .status(500)
@@ -367,6 +424,12 @@ export async function registerRecordingRoutes(
 
                 reply.header("Accept-Ranges", "bytes");
                 reply.header("Content-Type", asset.contentType);
+                reply.header("Access-Control-Allow-Origin", "*");
+                reply.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+                reply.header("Access-Control-Allow-Headers", "Range");
+                reply.header("Cross-Origin-Resource-Policy", "cross-origin");
+                reply.header("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
+                reply.header("ETag", `"${asset.sizeBytes}-${Date.now()}"`);
 
                 if (rangeHeader) {
                     const matches = /bytes=(\d+)-(\d*)/.exec(rangeHeader);

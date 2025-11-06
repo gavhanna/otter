@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, createWriteStream } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
-import { PassThrough } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
@@ -82,7 +81,8 @@ export type RecordingListFilters = {
 export type AudioUpload = {
     filename?: string;
     mimetype?: string;
-    stream: NodeJS.ReadableStream;
+    stream?: NodeJS.ReadableStream;
+    buffer?: Buffer;
 };
 
 export async function listRecordings(
@@ -415,28 +415,59 @@ async function persistRecordingFile(
     mkdirSync(dirname(absolutePath), { recursive: true });
 
     const hash = createHash("sha256");
-    const passThrough = new PassThrough();
     let sizeBytes = 0;
 
-    passThrough.on("data", (chunk: Buffer) => {
-        sizeBytes += chunk.length;
-        hash.update(chunk);
-    });
-
     try {
-        await pipeline(
-            audio.stream,
-            passThrough,
-            createWriteStream(absolutePath)
-        );
+        if (audio.buffer) {
+            // Handle buffered audio data
+            sizeBytes = audio.buffer.length;
+            hash.update(audio.buffer);
+
+            const { writeFile } = await import("node:fs/promises");
+            await writeFile(absolutePath, audio.buffer);
+        } else if (audio.stream) {
+            // Handle streamed audio data
+            const { Transform } = await import("node:stream");
+
+            const hashTransform = new Transform({
+                transform(chunk: Buffer, encoding, callback) {
+                    sizeBytes += chunk.length;
+                    hash.update(chunk);
+                    callback(null, chunk); // Pass the chunk through unchanged
+                }
+            });
+
+            await pipeline(
+                audio.stream,
+                hashTransform,
+                createWriteStream(absolutePath)
+            );
+        } else {
+            throw new Error("No audio data provided (buffer or stream required)");
+        }
     } catch (error) {
         await safeUnlink(absolutePath);
         throw error;
     }
 
+    // Normalize and validate content type for browser compatibility
+    let contentType = audio.mimetype ?? "application/octet-stream";
+    const normalizedMime = contentType.split(";")[0]?.toLowerCase();
+
+    // Map to browser-compatible MIME types
+    const mimeFixes: Record<string, string> = {
+        "audio/x-wav": "audio/wav",
+        "audio/x-m4a": "audio/mp4",
+        "audio/mp4": "audio/mp4", // Ensure proper MP4 MIME type
+    };
+
+    if (mimeFixes[normalizedMime]) {
+        contentType = mimeFixes[normalizedMime];
+    }
+
     return {
         storagePath: relativePath,
-        contentType: audio.mimetype ?? "application/octet-stream",
+        contentType,
         sizeBytes,
         checksum: hash.digest("hex"),
     };
@@ -462,6 +493,8 @@ function inferExtension(mimetype?: string, filename?: string): string {
         "audio/mp4": ".m4a",
         "audio/aac": ".aac",
         "audio/flac": ".flac",
+        "audio/x-wav": ".wav",
+        "audio/x-m4a": ".m4a",
     };
 
     if (normalizedMime && mimeMap[normalizedMime]) {

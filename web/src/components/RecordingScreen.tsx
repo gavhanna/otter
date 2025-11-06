@@ -389,7 +389,7 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
                             </div>
 
                             {/* Title Input */}
-                            {(state === "preview" || state === "saving") && (
+                            {state === "preview" && (
                                 <div className="max-w-md mx-auto">
                                     <label className="block text-left">
                                         <span className="text-sm font-medium text-slate-300">Title</span>
@@ -401,6 +401,21 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
                                             placeholder="Morning ideas, Grocery note…"
                                         />
                                     </label>
+                                </div>
+                            )}
+
+                            {/* Loading Screen */}
+                            {state === "saving" && (
+                                <div className="max-w-md mx-auto text-center">
+                                    <div className="flex flex-col items-center space-y-4">
+                                        <div className="w-12 h-12 border-4 border-slate-600 border-t-brand rounded-full animate-spin"></div>
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-white mb-2">Saving Recording</h3>
+                                            <p className="text-sm text-slate-400">
+                                                This may take a moment for longer recordings...
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
