@@ -23,18 +23,6 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   app.decorate('db', db);
   app.decorateRequest('db', { getter: () => db });
 
-  app.addHook('onRequest', (request, _reply, done) => {
-    const url = request.raw.url ?? '';
-    if (url === '/api' || url === '/api/') {
-      request.raw.url = '/';
-    } else if (url.startsWith('/api/')) {
-      request.raw.url = url.slice(4);
-    } else if (url.startsWith('/api?')) {
-      request.raw.url = `/?${url.slice(5)}`;
-    }
-    done();
-  });
-
   await app.register(fastifyCors, {
     origin: config.corsOrigin,
     credentials: true
@@ -66,13 +54,16 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
 
   await app.register(sessionPlugin);
 
-  await app.register(async (instance) => {
-    await registerHealthRoutes(instance);
-    await registerAuthRoutes(instance);
-    await registerAdminRoutes(instance);
-    await registerRecordingRoutes(instance);
-    await registerStorageRoutes(instance);
-  });
+  await app.register(
+    async (instance) => {
+      await registerHealthRoutes(instance);
+      await registerAuthRoutes(instance);
+      await registerAdminRoutes(instance);
+      await registerRecordingRoutes(instance);
+      await registerStorageRoutes(instance);
+    },
+    { prefix: '/api' }
+  );
 
   if (config.uiDistPath) {
     const uiRoot = resolve(config.uiDistPath);
