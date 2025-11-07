@@ -1,0 +1,26 @@
+services:
+    api:
+        image: ghcr.io/gavhanna/otter-api:latest
+        env_file:
+            - api/.env
+        environment:
+            DATABASE_PATH: /data/otter.sqlite
+            STORAGE_DIR: /data/audio
+            HOST: 0.0.0.0
+            PORT: 4000
+        volumes:
+            - otter_data:/data
+        expose:
+            - "4000"
+        restart: unless-stopped
+
+    web:
+        image: ghcr.io/gavhanna/otter-web:latest
+        depends_on:
+            - api
+        ports:
+            - "8080:80"
+        restart: unless-stopped
+
+volumes:
+    otter_data:

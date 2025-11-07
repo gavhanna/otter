@@ -14,6 +14,7 @@ export type AppConfig = {
   storageDir: string;
   jwtSecret: string;
   bootstrapAdmin: BootstrapAdminConfig | null;
+  uiDistPath: string | null;
 };
 
 export type BootstrapAdminConfig = {
@@ -47,7 +48,8 @@ export function loadConfig(): AppConfig {
     databasePath: process.env.DATABASE_PATH ?? './data/otter.sqlite',
     storageDir: process.env.STORAGE_DIR ?? './data/audio',
     jwtSecret: process.env.JWT_SECRET ?? 'change-me-super-secret',
-    bootstrapAdmin: readBootstrapAdmin()
+    bootstrapAdmin: readBootstrapAdmin(),
+    uiDistPath: process.env.UI_DIST_PATH?.trim() || null
   };
 }
 

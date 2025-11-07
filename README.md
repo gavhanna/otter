@@ -22,7 +22,7 @@ npm run dev --workspace web
 Additional setup details live in `docs/PROJECT_PLAN.md`.
 
 ## Docker
-Production-grade Dockerfiles and a reference compose stack live in this repo, plus a GitHub Actions workflow that pushes both images to GHCR. See `docs/DOCKER.md` for build, registry, and Unraid deployment notes.
+A single Docker image now bundles the API + UI (with optional split images if you need them), and a GitHub Action publishes all variants to GHCR. See `docs/DOCKER.md` for build, registry, and Unraid deployment notes.
 
 ## First-Time Bootstrap
 1. Copy the sample environment file: `cp api/.env.example api/.env`.

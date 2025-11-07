@@ -1,9 +1,9 @@
 services:
-  api:
+  app:
+    image: ${OTTER_IMAGE:-otter-app:local}
     build:
       context: .
-      dockerfile: api/Dockerfile
-    image: otter-api:local
+      dockerfile: Dockerfile
     env_file:
       - api/.env
     environment:
@@ -11,21 +11,11 @@ services:
       STORAGE_DIR: /data/audio
       HOST: 0.0.0.0
       PORT: 4000
+      UI_DIST_PATH: /app/web/dist
     volumes:
       - otter_data:/data
-    expose:
-      - "4000"
-    restart: unless-stopped
-
-  web:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-    image: otter-web:local
-    depends_on:
-      - api
     ports:
-      - "8080:80"
+      - "8080:4000"
     restart: unless-stopped
 
 volumes:
