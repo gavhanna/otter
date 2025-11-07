@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+api/node_modules
+web/node_modules
+api/dist
+web/dist
+api/data
+web/.vite
+*.log
+docs/**/*.md~backup

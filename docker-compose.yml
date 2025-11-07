@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: otter-api:local
+    env_file:
+      - api/.env
+    environment:
+      DATABASE_PATH: /data/otter.sqlite
+      STORAGE_DIR: /data/audio
+      HOST: 0.0.0.0
+      PORT: 4000
+    volumes:
+      - otter_data:/data
+    expose:
+      - "4000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: otter-web:local
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  otter_data:
