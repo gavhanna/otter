@@ -1,4 +1,4 @@
-const API_BASE = '/';
+const API_BASE = '/api';
 
 type RequestOptions = RequestInit & {
   json?: unknown;
@@ -54,38 +54,38 @@ async function safeJson(response: Response): Promise<unknown> {
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ user: AuthUser; message: string }>('api/auth/login', {
+    request<{ user: AuthUser; message: string }>('/auth/login', {
       method: 'POST',
       json: { email, password }
     }),
   logout: () =>
-    request<void>('api/auth/logout', {
+    request<void>('/auth/logout', {
       method: 'POST'
     }),
   me: () =>
-    request<{ user: AuthUser }>('api/auth/me', {
+    request<{ user: AuthUser }>('/auth/me', {
       method: 'GET'
     }),
   bootstrap: (email: string, password: string, displayName?: string) =>
-    request<{ user: AuthUser; message: string }>('api/auth/bootstrap', {
+    request<{ user: AuthUser; message: string }>('/auth/bootstrap', {
       method: 'POST',
       json: { email, password, displayName }
     }),
   listRecordings: () =>
-    request<{ recordings: RecordingSummary[] }>('api/recordings', {
+    request<{ recordings: RecordingSummary[] }>('/recordings', {
       method: 'GET'
     }),
   createRecording: (formData: FormData) =>
-    request<{ recording: RecordingSummary }>('api/recordings', {
+    request<{ recording: RecordingSummary }>('/recordings', {
       method: 'POST',
       body: formData
     }),
   getRecording: (id: string) =>
-    request<{ recording: RecordingSummary }>(`api/recordings/${id}`, {
+    request<{ recording: RecordingSummary }>(`/recordings/${id}`, {
       method: 'GET'
     }),
   updateFavourite: (id: string, isFavourited: boolean) =>
-    request<{ recording: RecordingSummary }>(`api/recordings/${id}/favourite`, {
+    request<{ recording: RecordingSummary }>(`/recordings/${id}/favourite`, {
       method: 'PATCH',
       json: { isFavourited }
     }),
@@ -97,16 +97,16 @@ export const api = {
         locationLongitude?: number | null;
         locationSource?: 'manual' | 'geolocation' | null;
     }) =>
-    request<{ recording: RecordingSummary }>(`api/recordings/${id}`, {
+    request<{ recording: RecordingSummary }>(`/recordings/${id}`, {
       method: 'PATCH',
       json: updates
     }),
   deleteRecording: (id: string) =>
-    request<{ message: string }>(`api/recordings/${id}`, {
+    request<{ message: string }>(`/recordings/${id}`, {
       method: 'DELETE'
     }),
   getStorageUsage: () =>
-    request<{ storage: StorageUsage }>('api/storage', {
+    request<{ storage: StorageUsage }>('/storage', {
       method: 'GET'
     })
 };
