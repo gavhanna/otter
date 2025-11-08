@@ -40,6 +40,27 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
       new Date(a.recordedAt ?? a.createdAt).getTime()
   );
 
+  // Group recordings by month
+  const groupedRecordings = sortedRecordings.reduce((groups, recording) => {
+    const date = new Date(recording.recordedAt || recording.createdAt);
+    const monthKey = formatMonthKey(date);
+
+    if (!groups[monthKey]) {
+      groups[monthKey] = {
+        monthLabel: formatMonthLabel(date),
+        recordings: []
+      };
+    }
+
+    groups[monthKey].recordings.push(recording);
+    return groups;
+  }, {} as Record<string, { monthLabel: string; recordings: typeof recordings }>);
+
+  // Convert to array and sort by month (most recent first)
+  const sortedGroups = Object.entries(groupedRecordings)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([, group]) => group);
+
   const formatDuration = (durationMs: number) => {
     const minutes = Math.floor(durationMs / 60000);
     const seconds = Math.floor((durationMs % 60000) / 1000);
@@ -117,31 +138,45 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
             <p className="text-slate-400 mb-6">Tap the record button to create your first recording</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800">
-            {sortedRecordings.map((recording) => (
-              <button
-                key={recording.id}
-                onClick={() => onRecordingSelect(recording.id)}
-                className="w-full px-4 py-3 text-left hover:bg-slate-800/50 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-white truncate">
-                      {recording.title}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-                      <span>{formatDate(recording.recordedAt || recording.createdAt)}</span>
-                      <span>•</span>
-                      <span>{formatDuration(recording.durationMs)}</span>
-                    </div>
-                  </div>
-                  {recording.isFavourited && (
-                    <svg className="w-4 h-4 text-brand flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                  )}
+          <div>
+            {sortedGroups.map((group) => (
+              <div key={group.monthLabel}>
+                {/* Month header */}
+                <div className="px-4 py-2 bg-slate-900/60 sticky top-0 z-10 border-b border-slate-800">
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    {group.monthLabel}
+                  </h3>
                 </div>
-              </button>
+
+                {/* Recordings for this month */}
+                <div className="divide-y divide-slate-800">
+                  {group.recordings.map((recording) => (
+                    <button
+                      key={recording.id}
+                      onClick={() => onRecordingSelect(recording.id)}
+                      className="w-full px-4 py-3 text-left hover:bg-slate-800/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-white truncate">
+                            {recording.title}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
+                            <span>{formatDate(recording.recordedAt || recording.createdAt)}</span>
+                            <span>•</span>
+                            <span>{formatDuration(recording.durationMs)}</span>
+                          </div>
+                        </div>
+                        {recording.isFavourited && (
+                          <svg className="w-4 h-4 text-brand flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -160,4 +195,22 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
       </div>
     </div>
   );
+}
+
+function formatMonthKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function formatMonthLabel(date: Date): string {
+  const now = new Date();
+  const isCurrentYear = date.getFullYear() === now.getFullYear();
+
+  const month = date.toLocaleDateString('en-US', {
+    month: 'long',
+    year: isCurrentYear ? undefined : 'numeric'
+  });
+
+  return month;
 }

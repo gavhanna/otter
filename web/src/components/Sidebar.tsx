@@ -64,6 +64,27 @@ export function Sidebar({
         }
     });
 
+    // Group recordings by month
+    const groupedRecordings = filteredRecordings.reduce((groups, recording) => {
+        const date = new Date(recording.recordedAt ?? recording.createdAt);
+        const monthKey = formatMonthKey(date);
+
+        if (!groups[monthKey]) {
+            groups[monthKey] = {
+                monthLabel: formatMonthLabel(date),
+                recordings: []
+            };
+        }
+
+        groups[monthKey].recordings.push(recording);
+        return groups;
+    }, {} as Record<string, { monthLabel: string; recordings: typeof recordings }>);
+
+    // Convert to array and sort by month (most recent first)
+    const sortedGroups = Object.entries(groupedRecordings)
+        .sort(([a], [b]) => b.localeCompare(a))
+        .map(([, group]) => group);
+
     const isMainRecordingsView = currentPath === "/";
 
     return (
@@ -154,56 +175,65 @@ export function Sidebar({
                                 "No favourite recordings."}
                         </div>
                     ) : (
-                        filteredRecordings.map((recording) => (
-                            <article
-                                key={recording.id}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => onRecordingSelect(recording.id)}
-                                onKeyDown={(event) => {
-                                    if (
-                                        event.key === "Enter" ||
-                                        event.key === " "
-                                    ) {
-                                        event.preventDefault();
-                                        onRecordingSelect(recording.id);
-                                    }
-                                }}
-                                className={[
-                                    "rounded-xl border p-3 transition focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer",
-                                    recording.id === selectedRecordingId
-                                        ? "border-brand bg-brand/10 text-white"
-                                        : "border-slate-800 bg-slate-900/60 hover:border-brand hover:bg-slate-900",
-                                ].join(" ")}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                                        {recording.isFavourited && (
-                                            <svg
-                                                className="h-4 w-4 text-brand mt-0.5 flex-shrink-0"
-                                                fill="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                            </svg>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-semibold text-slate-100 truncate">
-                                                {recording.title}
-                                            </h4>
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                {formatDate(
-                                                    recording.recordedAt ??
-                                                        recording.createdAt
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-slate-400 ml-2 flex-shrink-0">
-                                        {formatDuration(recording.durationMs)}
-                                    </span>
+                        sortedGroups.map((group) => (
+                            <div key={group.monthLabel} className="mb-4">
+                                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                                    {group.monthLabel}
+                                </h3>
+                                <div className="space-y-2">
+                                    {group.recordings.map((recording) => (
+                                        <article
+                                            key={recording.id}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => onRecordingSelect(recording.id)}
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" ||
+                                                    event.key === " "
+                                                ) {
+                                                    event.preventDefault();
+                                                    onRecordingSelect(recording.id);
+                                                }
+                                            }}
+                                            className={[
+                                                "rounded-xl border p-3 transition focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer",
+                                                recording.id === selectedRecordingId
+                                                    ? "border-brand bg-brand/10 text-white"
+                                                    : "border-slate-800 bg-slate-900/60 hover:border-brand hover:bg-slate-900",
+                                            ].join(" ")}
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-start gap-2 flex-1 min-w-0">
+                                                    {recording.isFavourited && (
+                                                        <svg
+                                                            className="h-4 w-4 text-brand mt-0.5 flex-shrink-0"
+                                                            fill="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                        >
+                                                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                                        </svg>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                                    <h4 className="text-sm font-semibold text-slate-100 truncate">
+                                                            {recording.title}
+                                                        </h4>
+                                                        <p className="text-xs text-slate-500 mt-1">
+                                                            {formatDate(
+                                                                recording.recordedAt ??
+                                                                    recording.createdAt
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs text-slate-400 ml-2 flex-shrink-0">
+                                                    {formatDuration(recording.durationMs)}
+                                                </span>
+                                            </div>
+                                        </article>
+                                    ))}
                                 </div>
-                            </article>
+                            </div>
                         ))
                     )}
                 </div>
@@ -314,4 +344,22 @@ function formatDuration(durationMs: number | null | undefined): string {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = (totalSeconds % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
+}
+
+function formatMonthKey(date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    return `${year}-${month}`;
+}
+
+function formatMonthLabel(date: Date): string {
+    const now = new Date();
+    const isCurrentYear = date.getFullYear() === now.getFullYear();
+
+    const month = date.toLocaleDateString('en-US', {
+        month: 'long',
+        year: isCurrentYear ? undefined : 'numeric'
+    });
+
+    return month;
 }
