@@ -6,11 +6,13 @@ import { api } from "../lib/api";
 interface RecordingViewProps {
     recordingId: string | null;
     onRecordingDeleted?: () => void;
+    onClose?: () => void;
 }
 
 export function RecordingView({
     recordingId,
     onRecordingDeleted,
+    onClose,
 }: RecordingViewProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -496,83 +498,20 @@ export function RecordingView({
     }
 
     return (
-        <div className="flex-1 flex flex-col h-full">
-            <header className="border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-sm px-8 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                        {isEditingTitle ? (
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="text"
-                                    value={editTitle}
-                                    onChange={(e) =>
-                                        setEditTitle(e.target.value)
-                                    }
-                                    onKeyDown={handleKeyDown}
-                                    disabled={isUpdating}
-                                    className="text-2xl font-bold text-white bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 focus:outline-none focus:border-brand flex-1 min-w-0"
-                                    placeholder="Recording title..."
-                                    autoFocus
-                                />
-                                <button
-                                    onClick={handleSaveTitle}
-                                    disabled={
-                                        isUpdating || editTitle.trim() === ""
-                                    }
-                                    className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-3 py-1 text-sm hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    {isUpdating ? (
-                                        <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin"></div>
-                                    ) : (
-                                        "Save"
-                                    )}
-                                </button>
-                                <button
-                                    onClick={handleCancelEditTitle}
-                                    disabled={isUpdating}
-                                    className="rounded-lg border border-slate-700 text-slate-300 px-3 py-1 text-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <h1
-                                    className="text-2xl font-bold text-white cursor-pointer hover:text-brand transition-colors truncate"
-                                    onClick={handleStartEditTitle}
-                                    title="Click to edit title"
-                                >
-                                    {recording.title}
-                                </h1>
-                                <button
-                                    onClick={handleStartEditTitle}
-                                    className="rounded-lg border border-slate-700 text-slate-400 p-1 hover:bg-slate-800 hover:text-slate-300 transition-colors"
-                                    title="Edit title"
-                                >
-                                    <svg
-                                        className="w-4 h-4"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                        />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-                        <p className="text-sm text-slate-400 mt-1">
-                            {formatDate(
-                                recording.recordedAt ?? recording.createdAt
-                            )}{" "}
-                            • {formatDuration(recording.durationMs)}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3 ml-4">
+        <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden max-w-full">
+            <header className="border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-sm px-4 md:px-8 py-4 flex-shrink-0">
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                    {/* Mobile back button */}
+                    <button
+                        onClick={onClose}
+                        className="md:hidden w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <div className="flex-1"></div>
+                    <div className="flex items-center gap-2 ml-auto flex-shrink-0">
                         <button
                             onClick={handleToggleFavourite}
                             disabled={!recording?.id}
@@ -581,7 +520,7 @@ export function RecordingView({
                                     ? "Unfavourite recording"
                                     : "Favourite recording"
                             }
-                            className={`rounded-lg border px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                            className={`rounded-lg border px-2 md:px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
                                 !recording?.id
                                     ? "border-slate-800 text-slate-500 cursor-not-allowed"
                                     : recording?.isFavourited
@@ -616,7 +555,7 @@ export function RecordingView({
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
                             disabled={!recording?.id || isDeleting}
-                            className="rounded-lg border border-rose-700 px-4 py-2 text-sm text-rose-400 hover:bg-rose-900/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="rounded-lg border border-rose-700 px-2 md:px-3 py-2 text-sm text-rose-400 hover:bg-rose-900/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             aria-label="Delete recording"
                         >
                             <svg
@@ -637,9 +576,60 @@ export function RecordingView({
                 </div>
             </header>
 
-            <div className="flex-1 flex flex-col h-full">
+            <div className="flex-1 flex flex-col h-full min-h-0">
                 {/* Google Recorder Style Full Height Layout */}
-                <div className="flex-1 flex flex-col bg-slate-900/30 relative">
+                <div className="flex-1 flex flex-col bg-slate-900/30 relative min-h-0">
+                    {/* Recording Title and Info */}
+                    <div className="px-6 pt-6 pb-4 bg-slate-900/50 backdrop-blur-sm border-b border-slate-800/30">
+                        {isEditingTitle ? (
+                            <div className="flex flex-col gap-3 max-w-4xl mx-auto">
+                                <input
+                                    type="text"
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    disabled={isUpdating}
+                                    className="text-2xl md:text-3xl font-bold text-white bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 focus:outline-none focus:border-brand w-full"
+                                    placeholder="Recording title..."
+                                    autoFocus
+                                />
+                                <div className="flex gap-3 justify-center">
+                                    <button
+                                        onClick={handleSaveTitle}
+                                        disabled={isUpdating || editTitle.trim() === ""}
+                                        className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-6 py-2 text-sm font-medium hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        {isUpdating ? (
+                                            <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin"></div>
+                                        ) : (
+                                            "Save"
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={handleCancelEditTitle}
+                                        disabled={isUpdating}
+                                        className="rounded-lg border border-slate-700 text-slate-300 px-6 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="max-w-4xl mx-auto text-center">
+                                <h1
+                                    className="text-2xl md:text-3xl font-bold text-white cursor-pointer hover:text-brand transition-colors mb-2"
+                                    onClick={handleStartEditTitle}
+                                    title="Click to edit title"
+                                >
+                                    {recording.title}
+                                </h1>
+                                <p className="text-sm text-slate-400">
+                                    {formatDate(recording.recordedAt ?? recording.createdAt)} • {formatDuration(recording.durationMs)}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Main Waveform Area - Takes up most of the space */}
                     <div className="flex-1 relative bg-slate-950/60 overflow-hidden">
                         {/* Waveform Display */}
@@ -712,10 +702,10 @@ export function RecordingView({
                         )}
 
                         {/* Time Displays - Top corners */}
-                        <div className="absolute top-4 left-4 text-2xl text-white/90 font-semibold">
+                        <div className="absolute top-4 left-4 text-lg md:text-2xl text-white/90 font-semibold tabular-nums">
                             {formatTime(currentTime)}
                         </div>
-                        <div className="absolute top-4 right-4 text-2xl text-white/90 font-semibold">
+                        <div className="absolute top-4 right-4 text-lg md:text-2xl text-white/90 font-semibold tabular-nums">
                             {formatTime(
                                 recording?.durationMs
                                     ? recording.durationMs / 1000
@@ -724,7 +714,7 @@ export function RecordingView({
                         </div>
 
                         {/* Subtle Volume Control - Top right */}
-                        <div className="absolute top-4 right-32 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="absolute top-4 right-20 md:right-32 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <svg
                                 className="w-5 h-5 text-white/70"
                                 fill="none"
@@ -762,7 +752,7 @@ export function RecordingView({
                     </div>
 
                     {/* Bottom Controls Section */}
-                    <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-4">
+                    <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-4 flex-shrink-0 overflow-x-hidden">
                         {/* Custom Progress Bar */}
                         <div className="mb-4">
                             <div
@@ -814,7 +804,7 @@ export function RecordingView({
                         </div>
 
                         {/* Media Playback Controls */}
-                        <div className="flex items-center justify-center gap-4">
+                        <div className="flex items-center justify-center gap-3 md:gap-6">
                             {/* Skip Backward 5s Button */}
                             <button
                                 onClick={() => {
@@ -824,11 +814,11 @@ export function RecordingView({
                                     }
                                 }}
                                 disabled={!isWaveformReady}
-                                className="w-12 h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                className="w-14 h-14 md:w-12 md:h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                                 title="Skip backward 5 seconds"
                             >
                                 <svg
-                                    className="w-5 h-5"
+                                    className="w-5 h-5 md:w-4 md:h-4"
                                     fill="currentColor"
                                     viewBox="0 0 24 24"
                                 >
@@ -851,11 +841,11 @@ export function RecordingView({
                                     }
                                 }}
                                 disabled={!isWaveformReady}
-                                className="w-16 h-16 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105"
+                                className="w-20 h-20 md:w-16 md:h-16 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 active:scale-95"
                             >
                                 {isPlaying ? (
                                     <svg
-                                        className="w-7 h-7"
+                                        className="w-8 h-8 md:w-7 md:h-7"
                                         fill="currentColor"
                                         viewBox="0 0 24 24"
                                     >
@@ -863,7 +853,7 @@ export function RecordingView({
                                     </svg>
                                 ) : (
                                     <svg
-                                        className="w-7 h-7 ml-1"
+                                        className="w-8 h-8 md:w-7 md:h-7 ml-1"
                                         fill="currentColor"
                                         viewBox="0 0 24 24"
                                     >
@@ -882,11 +872,11 @@ export function RecordingView({
                                     }
                                 }}
                                 disabled={!isWaveformReady}
-                                className="w-12 h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                className="w-14 h-14 md:w-12 md:h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                                 title="Skip forward 10 seconds"
                             >
                                 <svg
-                                    className="w-5 h-5"
+                                    className="w-5 h-5 md:w-4 md:h-4"
                                     fill="currentColor"
                                     viewBox="0 0 24 24"
                                 >
