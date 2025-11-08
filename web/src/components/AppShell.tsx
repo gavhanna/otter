@@ -30,7 +30,7 @@ export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [selectedRecordingId, setSelectedRecordingId] = useState<string | null>(null);
-  const [isRecordingMode, setRecordingMode] = useState<boolean>(false);
+  const [isRecordingMode, setRecordingMode] = useState<boolean>(true); // Start in recording mode by default
 
   const handleRecordingComplete = (recordingId: string) => {
     setSelectedRecordingId(recordingId);

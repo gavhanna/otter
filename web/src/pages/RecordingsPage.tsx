@@ -1,22 +1,7 @@
-import { useNavigate } from '@tanstack/react-router';
-import { useEffect } from 'react';
 import { useRecording } from '../components/AppShell';
-import { useAuth } from '../lib/authStore';
 
 export function RecordingsPage() {
-  const { status } = useAuth();
   const { setRecordingMode } = useRecording();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (status === 'idle' || status === 'error') {
-      void navigate({ to: '/login' });
-    }
-  }, [status, navigate]);
-
-  if (status !== 'authenticated') {
-    return null;
-  }
 
   const handleNewRecording = () => {
     setRecordingMode(true);

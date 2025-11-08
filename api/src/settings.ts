@@ -1,4 +1,6 @@
 import { config as loadDotEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 let envLoaded = false;
 
@@ -37,6 +39,18 @@ export function loadConfig(): AppConfig {
   const port = Number(process.env.PORT ?? '4000');
   const sessionTtl = Number(process.env.SESSION_TTL_SECONDS ?? 60 * 60 * 24 * 7);
 
+  // Smart UI dist path detection
+  let uiDistPath = process.env.UI_DIST_PATH?.trim() || null;
+
+  // In development, automatically set UI_DIST_PATH if not explicitly set and dist exists
+  if (!uiDistPath && process.env.NODE_ENV !== 'production') {
+    const defaultUiPath = '../web/dist';
+    const resolvedPath = resolve(defaultUiPath);
+    if (existsSync(resolvedPath)) {
+      uiDistPath = resolvedPath;
+    }
+  }
+
   return {
     host: process.env.HOST ?? '0.0.0.0',
     port: Number.isFinite(port) ? port : 4000,
@@ -49,7 +63,7 @@ export function loadConfig(): AppConfig {
     storageDir: process.env.STORAGE_DIR ?? './data/audio',
     jwtSecret: process.env.JWT_SECRET ?? 'change-me-super-secret',
     bootstrapAdmin: readBootstrapAdmin(),
-    uiDistPath: process.env.UI_DIST_PATH?.trim() || null
+    uiDistPath
   };
 }
 

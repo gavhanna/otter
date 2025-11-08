@@ -10,6 +10,8 @@
     "scripts": {
         "build": "npm run build --workspaces",
         "dev": "concurrently \"npm run dev --workspace=api\" \"npm run dev --workspace=web\"",
+        "dev:api-only": "npm run dev --workspace=api",
+        "dev:prod-ui": "npm run build --workspace=web && npm run dev --workspace=api",
         "lint": "npm run lint --if-present --workspaces",
         "format": "npm run format --if-present --workspaces",
         "test": "npm run test --if-present --workspaces"

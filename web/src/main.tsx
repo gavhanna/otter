@@ -5,50 +5,116 @@ import {
   RouterProvider,
   createRootRoute,
   createRoute,
-  createRouter
+  createRouter,
+  useNavigate
 } from '@tanstack/react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import './index.css';
 import { AppShell } from './components/AppShell';
 import { RecordingsPage } from './pages/RecordingsPage';
 import { RecentPage } from './pages/RecentPage';
 import { FavouritesPage } from './pages/FavouritesPage';
 import { LoginPage } from './pages/LoginPage';
-import { AuthProvider } from './lib/authStore';
+import { AuthProvider, useAuth } from './lib/authStore';
 
+// Auth guard component for protected routes
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { status } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (status === 'idle' || status === 'error') {
+      void navigate({ to: '/login' });
+    }
+  }, [status, navigate]);
+
+  if (status !== 'authenticated') {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+// Auth guard for login page (redirect if already authenticated)
+function LoginGuard({ children }: { children: React.ReactNode }) {
+  const { status, user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && status === 'authenticated') {
+      void navigate({ to: '/' });
+    }
+  }, [user, status, navigate]);
+
+  if (status === 'checking') {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+// Root route - provides auth context to all routes
 const rootRoute = createRootRoute({
   component: () => (
-    <AppShell>
+    <AuthProvider>
       <Outlet />
-    </AppShell>
+    </AuthProvider>
   )
 });
 
-const loginRoute = createRoute({
+// Auth layout route - for login/register pages (no app shell)
+const authLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
+  id: 'auth',
+  component: () => (
+    <LoginGuard>
+      <Outlet />
+    </LoginGuard>
+  ),
+});
+
+const loginRoute = createRoute({
+  getParentRoute: () => authLayoutRoute,
   path: '/login',
   component: LoginPage
 });
 
-const recordingsRoute = createRoute({
+// App layout route - for authenticated main application
+const appLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
+  id: 'app',
+  component: () => (
+    <AuthGuard>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </AuthGuard>
+  )
+});
+
+const recordingsRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
   path: '/',
   component: RecordingsPage
 });
 
 const recentRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appLayoutRoute,
   path: '/recent',
   component: RecentPage
 });
 
 const favouritesRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appLayoutRoute,
   path: '/favourites',
   component: FavouritesPage
 });
 
-const routeTree = rootRoute.addChildren([loginRoute, recordingsRoute, recentRoute, favouritesRoute]);
+const routeTree = rootRoute.addChildren([
+  authLayoutRoute.addChildren([loginRoute]),
+  appLayoutRoute.addChildren([recordingsRoute, recentRoute, favouritesRoute])
+]);
 
 const router = createRouter({
   routeTree
@@ -65,9 +131,7 @@ const queryClient = new QueryClient();
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </React.StrictMode>
 );
