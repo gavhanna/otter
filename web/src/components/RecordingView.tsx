@@ -356,14 +356,6 @@ export function RecordingView({
         }
     };
 
-    // Handle speed control
-    const handleSpeedChange = () => {
-        const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
-        const currentIndex = speeds.indexOf(playbackSpeed);
-        const nextIndex = (currentIndex + 1) % speeds.length;
-        setPlaybackSpeed(speeds[nextIndex]);
-    };
-
     // Initialize WaveSurfer when recording changes (but not when only favourite status changes)
     useEffect(() => {
         if (!audioSrc || !waveformRef.current || !recordingId) {
@@ -784,10 +776,8 @@ export function RecordingView({
                                 />
                             </div>
                         </div>
-                    </div>;
-                    {
-                        /* Bottom Controls Section */
-                    }
+                    </div>
+                    ;{/* Bottom Controls Section */}
                     <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-6 flex-shrink-0">
                         {/* Media Playback Controls */}
                         <div className="flex items-center justify-center gap-8 md:gap-12">
@@ -875,18 +865,32 @@ export function RecordingView({
                         {/* Speed Control and Time Display */}
                         <div className="flex items-center justify-between mt-6 px-4">
                             {/* Speed Control */}
-                            <button
-                                onClick={handleSpeedChange}
-                                disabled={!isWaveformReady}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                    playbackSpeed === 1
-                                        ? "bg-slate-700 text-slate-300"
-                                        : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                                } hover:bg-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed`}
-                                title="Playback speed"
-                            >
-                                {playbackSpeed}x
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <label
+                                    htmlFor="playback-speed"
+                                    className="text-sm text-slate-400 sr-only"
+                                >
+                                    Speed:
+                                </label>
+                                <select
+                                    id="playback-speed"
+                                    value={playbackSpeed}
+                                    onChange={(e) =>
+                                        setPlaybackSpeed(
+                                            parseFloat(e.target.value)
+                                        )
+                                    }
+                                    disabled={!isWaveformReady}
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-slate-800 text-white border border-slate-600 focus:border-brand focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer`}
+                                >
+                                    <option value={0.5}>0.5x</option>
+                                    <option value={0.75}>0.75x</option>
+                                    <option value={1}>1x</option>
+                                    <option value={1.25}>1.25x</option>
+                                    <option value={1.5}>1.5x</option>
+                                    <option value={2}>2x</option>
+                                </select>
+                            </div>
 
                             {/* Time Display */}
                             <div className="text-white/90 font-mono text-lg">
@@ -898,8 +902,7 @@ export function RecordingView({
                                 )}
                             </div>
                         </div>
-                    </div>;
-                    ; ; ;;
+                    </div>
                 </div>
             </div>
 
@@ -1041,5 +1044,9 @@ function getFormatName(contentType: string): string {
         "audio/mp3": "MP3 Audio", // Some browsers use audio/mp3
     };
 
-    return mimeToFormat[contentType.toLowerCase()] || contentType.split("/")[1]?.toUpperCase() || "Audio";
+    return (
+        mimeToFormat[contentType.toLowerCase()] ||
+        contentType.split("/")[1]?.toUpperCase() ||
+        "Audio"
+    );
 }
