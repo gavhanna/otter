@@ -10,7 +10,7 @@ interface MobileRecordingListProps {
 
 export function MobileRecordingList({ onRecordingSelect, onNewRecording }: MobileRecordingListProps) {
   const { user, status } = useAuth();
-  const [activeTab, setActiveTab] = useState<"all" | "recent" | "favourites">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "favourites">("all");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["recordings"],
@@ -25,16 +25,7 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
 
   // Filter recordings based on selected tab
   const filteredRecordings = recordings.filter((recording) => {
-    const recordingDate = new Date(
-      recording.recordedAt ?? recording.createdAt
-    );
-
     switch (activeTab) {
-      case "recent": {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        return recordingDate >= sevenDaysAgo;
-      }
       case "favourites":
         return recording.isFavourited;
       default:
@@ -88,7 +79,6 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
         <div className="flex px-2 pb-2">
           {[
             { id: "all", label: "All" },
-            { id: "recent", label: "Recent" },
             { id: "favourites", label: "Favorites" }
           ].map((tab) => (
             <button

@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/authStore";
@@ -18,9 +17,7 @@ export function Sidebar({
     onNewRecording,
 }: SidebarProps) {
     const { user, status } = useAuth();
-    const [sidebarTab, setSidebarTab] = useState<
-        "all" | "recent" | "favourites"
-    >("all");
+    const [sidebarTab, setSidebarTab] = useState<"all" | "favourites">("all");
 
     const { data, isLoading, error } = useQuery({
         queryKey: ["recordings"],
@@ -41,25 +38,25 @@ export function Sidebar({
         refetchInterval: 30000, // Refetch every 30 seconds
     });
 
-    const recordings = user ? (data || []) : [];
-    const storageUsage = storageData || { formattedSize: "0 B", usagePercentage: 0, totalFiles: 0 };
+    const recordings = user ? data || [] : [];
+    const storageUsage = storageData || {
+        formattedSize: "0 B",
+        usagePercentage: 0,
+        totalFiles: 0,
+    };
 
     // Filter recordings based on selected tab
     const filteredRecordings = recordings.filter((recording) => {
-        const recordingDate = new Date(
-            recording.recordedAt ?? recording.createdAt
-        );
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
         // Debug logging for favourites
         if (sidebarTab === "favourites") {
-            console.log('Recording favourite status:', recording.title, recording.isFavourited);
+            console.log(
+                "Recording favourite status:",
+                recording.title,
+                recording.isFavourited
+            );
         }
 
         switch (sidebarTab) {
-            case "recent":
-                return recordingDate >= sevenDaysAgo;
             case "favourites":
                 return recording.isFavourited === true;
             default:
@@ -111,7 +108,6 @@ export function Sidebar({
                 <div className="px-4 py-3 border-b border-slate-800">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                         {sidebarTab === "all" && "All Recordings"}
-                        {sidebarTab === "recent" && "Recent Recordings"}
                         {sidebarTab === "favourites" && "Favourite Recordings"}
                     </h3>
                     <div className="flex gap-1">
@@ -124,16 +120,6 @@ export function Sidebar({
                             }`}
                         >
                             All
-                        </button>
-                        <button
-                            onClick={() => setSidebarTab("recent")}
-                            className={`flex-1 rounded px-2 py-1 text-xs transition ${
-                                sidebarTab === "recent"
-                                    ? "bg-slate-700 text-white"
-                                    : "text-slate-400 hover:text-white hover:bg-slate-800"
-                            }`}
-                        >
-                            Recent
                         </button>
                         <button
                             onClick={() => setSidebarTab("favourites")}
@@ -164,7 +150,6 @@ export function Sidebar({
                     ) : filteredRecordings.length === 0 ? (
                         <div className="text-center py-8 text-sm text-slate-400">
                             {sidebarTab === "all" && "No recordings yet."}
-                            {sidebarTab === "recent" && "No recent recordings."}
                             {sidebarTab === "favourites" &&
                                 "No favourite recordings."}
                         </div>
@@ -194,7 +179,11 @@ export function Sidebar({
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-start gap-2 flex-1 min-w-0">
                                         {recording.isFavourited && (
-                                            <svg className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                            <svg
+                                                className="h-4 w-4 text-brand mt-0.5 flex-shrink-0"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
                                                 <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                             </svg>
                                         )}
@@ -234,7 +223,9 @@ export function Sidebar({
                                         Loading...
                                     </span>
                                 ) : (
-                                    `${storageUsage.totalFiles} file${storageUsage.totalFiles !== 1 ? 's' : ''}`
+                                    `${storageUsage.totalFiles} file${
+                                        storageUsage.totalFiles !== 1 ? "s" : ""
+                                    }`
                                 )}
                             </span>
                             <span>{storageUsage.formattedSize}</span>
@@ -243,24 +234,30 @@ export function Sidebar({
                             <div
                                 className={`h-full rounded-full transition-all duration-500 ease-out ${
                                     storageUsage.usagePercentage > 80
-                                        ? 'bg-rose-500'
+                                        ? "bg-rose-500"
                                         : storageUsage.usagePercentage > 60
-                                        ? 'bg-amber-500'
-                                        : 'bg-brand'
+                                        ? "bg-amber-500"
+                                        : "bg-brand"
                                 }`}
-                                style={{ width: `${Math.min(100, storageUsage.usagePercentage)}%` }}
+                                style={{
+                                    width: `${Math.min(
+                                        100,
+                                        storageUsage.usagePercentage
+                                    )}%`,
+                                }}
                             ></div>
                         </div>
                         {storageUsage.usagePercentage > 60 && (
-                            <div className={`text-xs ${
-                                storageUsage.usagePercentage > 80
-                                    ? 'text-rose-400'
-                                    : 'text-amber-400'
-                            }`}>
+                            <div
+                                className={`text-xs ${
+                                    storageUsage.usagePercentage > 80
+                                        ? "text-rose-400"
+                                        : "text-amber-400"
+                                }`}
+                            >
                                 {storageUsage.usagePercentage > 80
-                                    ? '⚠️ Storage almost full'
-                                    : 'ℹ️ Storage getting full'
-                                }
+                                    ? "⚠️ Storage almost full"
+                                    : "ℹ️ Storage getting full"}
                             </div>
                         )}
                     </div>
