@@ -18,6 +18,7 @@ export function RecordingView({
     const [currentTime, setCurrentTime] = useState(0);
     const [volume, setVolume] = useState(1);
     const [isWaveformReady, setIsWaveformReady] = useState(false);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -195,8 +196,16 @@ export function RecordingView({
             await Promise.race([
                 api.updateRecording(recording.id, { title: trimmedTitle }),
                 new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Title update timeout - please try again')), 45000)
-                )
+                    setTimeout(
+                        () =>
+                            reject(
+                                new Error(
+                                    "Title update timeout - please try again"
+                                )
+                            ),
+                        45000
+                    )
+                ),
             ]);
 
             // Success - now update local state
@@ -207,7 +216,6 @@ export function RecordingView({
             queryClient.invalidateQueries({
                 queryKey: ["recording", recordingId],
             });
-
         } catch (error) {
             console.error("Failed to update recording title:", error);
 
@@ -216,7 +224,11 @@ export function RecordingView({
             setEditTitle(recording.title); // Reset to original title
 
             // Show error message
-            alert(`Failed to save title: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            alert(
+                `Failed to save title: ${
+                    error instanceof Error ? error.message : "Unknown error"
+                }`
+            );
         } finally {
             setIsUpdating(false);
         }
@@ -265,7 +277,7 @@ export function RecordingView({
                 recording: {
                     ...oldData.recording,
                     location: trimmedLocation || null,
-                    locationSource: trimmedLocation ? 'manual' : null
+                    locationSource: trimmedLocation ? "manual" : null,
                 },
             };
         });
@@ -278,10 +290,10 @@ export function RecordingView({
                 recordings: oldData.recordings.map((r: any) =>
                     r.id === recording.id
                         ? {
-                            ...r,
-                            location: trimmedLocation || null,
-                            locationSource: trimmedLocation ? 'manual' : null
-                        }
+                              ...r,
+                              location: trimmedLocation || null,
+                              locationSource: trimmedLocation ? "manual" : null,
+                          }
                         : r
                 ),
             };
@@ -290,7 +302,7 @@ export function RecordingView({
         try {
             await api.updateRecording(recording.id, {
                 location: trimmedLocation || null,
-                locationSource: trimmedLocation ? 'manual' : null
+                locationSource: trimmedLocation ? "manual" : null,
             });
             setIsEditingLocation(false);
 
@@ -344,6 +356,14 @@ export function RecordingView({
         }
     };
 
+    // Handle speed control
+    const handleSpeedChange = () => {
+        const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+        const currentIndex = speeds.indexOf(playbackSpeed);
+        const nextIndex = (currentIndex + 1) % speeds.length;
+        setPlaybackSpeed(speeds[nextIndex]);
+    };
+
     // Initialize WaveSurfer when recording changes (but not when only favourite status changes)
     useEffect(() => {
         if (!audioSrc || !waveformRef.current || !recordingId) {
@@ -358,28 +378,33 @@ export function RecordingView({
         // Create new WaveSurfer instance
         const wavesurfer = WaveSurfer.create({
             container: waveformRef.current,
-            waveColor: "#475569", // slate-600 - more subtle
-            progressColor: "transparent", // hide built-in progress since we have custom one
-            cursorColor: "#ffffff", // white - more visible
-            barWidth: 3, // slightly thicker bars
-            barRadius: 2,
-            cursorWidth: 2, // more prominent cursor
-            height: "auto", // let it fill container
-            barGap: 2,
+            waveColor: "#374151", // darker gray for better contrast
+            progressColor: "#8da6cfff",
+            cursorColor: "#f97316",
+            barWidth: 4,
+            barRadius: 4,
+            cursorWidth: 2,
+            height: "auto", // fixed height for consistent appearance
+            barGap: 12,
             normalize: true,
             backend: "WebAudio",
             mediaControls: false,
             interact: true,
             hideScrollbar: true,
-            autoScroll: false,
-            fillParent: true, // fill container
-            dragToSeek: true, // enable drag to seek
+            autoCenter: true,
+            autoScroll: true,
+            fillParent: true,
+            dragToSeek: true,
         });
 
         // Event listeners
         wavesurfer.on("ready", () => {
             setIsWaveformReady(true);
             setIsPlaying(false);
+            console.log(
+                "WaveSurfer ready, duration:",
+                wavesurfer.getDuration()
+            );
         });
 
         wavesurfer.on("play", () => {
@@ -405,10 +430,13 @@ export function RecordingView({
             console.error("Error details:", {
                 name: error.name,
                 message: error.message,
-                stack: error.stack
+                stack: error.stack,
             });
             setIsWaveformReady(false);
         });
+
+        // Set initial playback speed
+        wavesurfer.setPlaybackRate(playbackSpeed);
 
         // Load audio
         wavesurfer.load(audioSrc);
@@ -423,6 +451,13 @@ export function RecordingView({
             setIsWaveformReady(false);
         };
     }, [audioSrc, recordingId]); // Keep these dependencies but ensure audioSrc is stable
+
+    // Update playback speed when it changes
+    useEffect(() => {
+        if (wavesurferRef.current && isWaveformReady) {
+            wavesurferRef.current.setPlaybackRate(playbackSpeed);
+        }
+    }, [playbackSpeed, isWaveformReady]);
 
     if (!recordingId) {
         return (
@@ -506,8 +541,18 @@ export function RecordingView({
                         onClick={onClose}
                         className="md:hidden w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition-colors"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 19l-7-7 7-7"
+                            />
                         </svg>
                     </button>
                     <div className="flex-1"></div>
@@ -586,7 +631,9 @@ export function RecordingView({
                                 <input
                                     type="text"
                                     value={editTitle}
-                                    onChange={(e) => setEditTitle(e.target.value)}
+                                    onChange={(e) =>
+                                        setEditTitle(e.target.value)
+                                    }
                                     onKeyDown={handleKeyDown}
                                     disabled={isUpdating}
                                     className="text-2xl md:text-3xl font-bold text-white bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 focus:outline-none focus:border-brand w-full"
@@ -596,7 +643,10 @@ export function RecordingView({
                                 <div className="flex gap-3 justify-center">
                                     <button
                                         onClick={handleSaveTitle}
-                                        disabled={isUpdating || editTitle.trim() === ""}
+                                        disabled={
+                                            isUpdating ||
+                                            editTitle.trim() === ""
+                                        }
                                         className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-6 py-2 text-sm font-medium hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         {isUpdating ? (
@@ -624,208 +674,145 @@ export function RecordingView({
                                     {recording.title}
                                 </h1>
                                 <p className="text-sm text-slate-400">
-                                    {formatDate(recording.recordedAt ?? recording.createdAt)} • {formatDuration(recording.durationMs)}
+                                    {formatDate(
+                                        recording.recordedAt ??
+                                            recording.createdAt
+                                    )}{" "}
+                                    • {formatDuration(recording.durationMs)}
                                 </p>
                             </div>
                         )}
                     </div>
-
                     {/* Main Waveform Area - Takes up most of the space */}
                     <div className="flex-1 relative bg-slate-950/60 overflow-hidden">
                         {/* Waveform Display */}
-                        <div
-                            ref={waveformRef}
-                            className="w-full h-full flex items-center justify-center cursor-pointer"
-                            onClick={() => {
-                                if (wavesurferRef.current && isWaveformReady) {
-                                    if (isPlaying) {
-                                        wavesurferRef.current.pause();
-                                    } else {
-                                        wavesurferRef.current.play();
-                                    }
-                                }
-                            }}
-                        >
-                            {!isWaveformReady && audioSrc && (
-                                <div className="flex items-center gap-3 text-slate-500">
-                                    <div className="w-4 h-4 border-2 border-slate-600 border-t-brand rounded-full animate-spin"></div>
-                                    <span className="text-sm">
-                                        Loading waveform...
-                                    </span>
-                                </div>
-                            )}
-                            {!audioSrc && (
-                                <p className="text-slate-500">
-                                    No audio available
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Overlay Play/Pause Button */}
-                        {audioSrc && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (wavesurferRef.current) {
-                                        if (isPlaying) {
-                                            wavesurferRef.current.pause();
-                                        } else {
-                                            wavesurferRef.current.play();
-                                        }
-                                    }
-                                }}
-                                disabled={!isWaveformReady}
-                                className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white/95 backdrop-blur-sm text-slate-900 flex items-center justify-center hover:bg-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl ${
-                                    isPlaying
-                                        ? "opacity-0 group-hover:opacity-100"
-                                        : "opacity-100"
-                                }`}
-                            >
-                                {isPlaying ? (
-                                    <svg
-                                        className="w-8 h-8"
-                                        fill="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                                    </svg>
-                                ) : (
-                                    <svg
-                                        className="w-8 h-8 ml-1"
-                                        fill="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path d="M8 5v14l11-7z" />
-                                    </svg>
-                                )}
-                            </button>
-                        )}
-
-                        {/* Time Displays - Top corners */}
-                        <div className="absolute top-4 left-4 text-lg md:text-2xl text-white/90 font-semibold tabular-nums">
-                            {formatTime(currentTime)}
-                        </div>
-                        <div className="absolute top-4 right-4 text-lg md:text-2xl text-white/90 font-semibold tabular-nums">
-                            {formatTime(
-                                recording?.durationMs
-                                    ? recording.durationMs / 1000
-                                    : 0
-                            )}
-                        </div>
-
-                        {/* Subtle Volume Control - Top right */}
-                        <div className="absolute top-4 right-20 md:right-32 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <svg
-                                className="w-5 h-5 text-white/70"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                                />
-                            </svg>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={volume}
-                                onChange={(e) => {
-                                    const newVolume = parseFloat(
-                                        e.target.value
-                                    );
-                                    setVolume(newVolume);
-                                    if (wavesurferRef.current) {
-                                        wavesurferRef.current.setVolume(
-                                            newVolume
-                                        );
-                                    }
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-20 h-1 accent-orange-500 cursor-pointer"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Bottom Controls Section */}
-                    <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-4 flex-shrink-0 overflow-x-hidden">
-                        {/* Custom Progress Bar */}
-                        <div className="mb-4">
+                        <div className="relative h-full flex items-center justify-center p-8">
                             <div
-                                className="relative h-2 bg-slate-700 rounded-full overflow-hidden cursor-pointer group"
+                                ref={waveformRef}
+                                className="w-full max-w-4xl mx-auto cursor-pointer group"
                                 onClick={(e) => {
                                     if (
                                         wavesurferRef.current &&
                                         isWaveformReady
                                     ) {
-                                        const rect =
-                                            e.currentTarget.getBoundingClientRect();
-                                        const percent =
-                                            (e.clientX - rect.left) /
-                                            rect.width;
-                                        wavesurferRef.current.seekTo(percent);
+                                        // Check if clicking on waveform itself (not just the container)
+                                        if (
+                                            e.target === waveformRef.current ||
+                                            waveformRef.current?.contains(
+                                                e.target as Node
+                                            )
+                                        ) {
+                                            const rect =
+                                                waveformRef.current.getBoundingClientRect();
+                                            const percent =
+                                                (e.clientX - rect.left) /
+                                                rect.width;
+                                            const duration =
+                                                wavesurferRef.current.getDuration();
+                                            console.log("Waveform click:", {
+                                                percent,
+                                                duration,
+                                                seekTo: percent,
+                                            });
+                                            wavesurferRef.current.seekTo(
+                                                percent
+                                            );
+                                        } else {
+                                            // Toggle play/pause when clicking container but not waveform
+                                            if (isPlaying) {
+                                                wavesurferRef.current.pause();
+                                            } else {
+                                                wavesurferRef.current.play();
+                                            }
+                                        }
                                     }
                                 }}
                             >
-                                {/* Progress Fill */}
-                                <div
-                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full transition-all duration-100"
-                                    style={{
-                                        width: `${
-                                            recording?.durationMs
-                                                ? (currentTime /
-                                                      (recording.durationMs /
-                                                          1000)) *
-                                                  100
-                                                : 0
-                                        }%`,
+                                {!isWaveformReady && audioSrc && (
+                                    <div className="flex items-center justify-center h-full">
+                                        <div className="flex items-center gap-3 text-slate-500">
+                                            <div className="w-6 h-6 border-2 border-slate-600 border-t-orange-500 rounded-full animate-spin"></div>
+                                            <span className="text-lg">
+                                                Loading waveform...
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                                {!audioSrc && (
+                                    <div className="flex items-center justify-center h-full">
+                                        <p className="text-slate-500 text-lg">
+                                            No audio available
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Volume Control - Top right, visible on hover */}
+                            <div className="absolute top-8 right-8 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-2">
+                                <svg
+                                    className="w-5 h-5 text-white/80"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                    />
+                                </svg>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value={volume}
+                                    onChange={(e) => {
+                                        const newVolume = parseFloat(
+                                            e.target.value
+                                        );
+                                        setVolume(newVolume);
+                                        if (wavesurferRef.current) {
+                                            wavesurferRef.current.setVolume(
+                                                newVolume
+                                            );
+                                        }
                                     }}
-                                />
-                                {/* Progress Handle */}
-                                <div
-                                    className="absolute top-1/2 transform -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                                    style={{
-                                        left: `${
-                                            recording?.durationMs
-                                                ? (currentTime /
-                                                      (recording.durationMs /
-                                                          1000)) *
-                                                  100
-                                                : 0
-                                        }%`,
-                                        marginLeft: "-8px",
-                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-24 h-1 accent-orange-500 cursor-pointer"
                                 />
                             </div>
                         </div>
-
+                    </div>;
+                    {
+                        /* Bottom Controls Section */
+                    }
+                    <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-6 flex-shrink-0">
                         {/* Media Playback Controls */}
-                        <div className="flex items-center justify-center gap-3 md:gap-6">
-                            {/* Skip Backward 5s Button */}
+                        <div className="flex items-center justify-center gap-8 md:gap-12">
+                            {/* Skip Backward 10s Button */}
                             <button
                                 onClick={() => {
-                                    if (wavesurferRef.current && isWaveformReady) {
-                                        const currentTime = wavesurferRef.current.getCurrentTime();
-                                        wavesurferRef.current.seekTo(Math.max(0, currentTime - 5));
+                                    if (
+                                        wavesurferRef.current &&
+                                        isWaveformReady
+                                    ) {
+                                        wavesurferRef.current.skip(-5);
                                     }
                                 }}
                                 disabled={!isWaveformReady}
-                                className="w-14 h-14 md:w-12 md:h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                                className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                                 title="Skip backward 5 seconds"
                             >
                                 <svg
-                                    className="w-5 h-5 md:w-4 md:h-4"
+                                    className="w-6 h-6 md:w-5 md:h-5"
                                     fill="currentColor"
                                     viewBox="0 0 24 24"
                                 >
                                     <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
                                 </svg>
                             </button>
-
                             {/* Play/Pause Button */}
                             <button
                                 onClick={() => {
@@ -841,11 +828,11 @@ export function RecordingView({
                                     }
                                 }}
                                 disabled={!isWaveformReady}
-                                className="w-20 h-20 md:w-16 md:h-16 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 active:scale-95"
+                                className="w-24 h-24 md:w-20 md:h-20 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-105 active:scale-95"
                             >
                                 {isPlaying ? (
                                     <svg
-                                        className="w-8 h-8 md:w-7 md:h-7"
+                                        className="w-10 h-10 md:w-8 md:h-8"
                                         fill="currentColor"
                                         viewBox="0 0 24 24"
                                     >
@@ -853,7 +840,7 @@ export function RecordingView({
                                     </svg>
                                 ) : (
                                     <svg
-                                        className="w-8 h-8 md:w-7 md:h-7 ml-1"
+                                        className="w-10 h-10 md:w-8 md:h-8 ml-1"
                                         fill="currentColor"
                                         viewBox="0 0 24 24"
                                     >
@@ -861,22 +848,22 @@ export function RecordingView({
                                     </svg>
                                 )}
                             </button>
-
                             {/* Skip Forward 10s Button */}
                             <button
                                 onClick={() => {
-                                    if (wavesurferRef.current && isWaveformReady) {
-                                        const currentTime = wavesurferRef.current.getCurrentTime();
-                                        const duration = wavesurferRef.current.getDuration();
-                                        wavesurferRef.current.seekTo(Math.min(duration, currentTime + 10));
+                                    if (
+                                        wavesurferRef.current &&
+                                        isWaveformReady
+                                    ) {
+                                        wavesurferRef.current.skip(10);
                                     }
                                 }}
                                 disabled={!isWaveformReady}
-                                className="w-14 h-14 md:w-12 md:h-12 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                                className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                                 title="Skip forward 10 seconds"
                             >
                                 <svg
-                                    className="w-5 h-5 md:w-4 md:h-4"
+                                    className="w-6 h-6 md:w-5 md:h-5"
                                     fill="currentColor"
                                     viewBox="0 0 24 24"
                                 >
@@ -884,7 +871,35 @@ export function RecordingView({
                                 </svg>
                             </button>
                         </div>
-                    </div>
+
+                        {/* Speed Control and Time Display */}
+                        <div className="flex items-center justify-between mt-6 px-4">
+                            {/* Speed Control */}
+                            <button
+                                onClick={handleSpeedChange}
+                                disabled={!isWaveformReady}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                    playbackSpeed === 1
+                                        ? "bg-slate-700 text-slate-300"
+                                        : "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                                } hover:bg-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title="Playback speed"
+                            >
+                                {playbackSpeed}x
+                            </button>
+
+                            {/* Time Display */}
+                            <div className="text-white/90 font-mono text-lg">
+                                {formatTime(currentTime)} /{" "}
+                                {formatTime(
+                                    recording?.durationMs
+                                        ? recording.durationMs / 1000
+                                        : 0
+                                )}
+                            </div>
+                        </div>
+                    </div>;
+                    ; ; ;;
                 </div>
             </div>
 
