@@ -777,7 +777,7 @@ export function RecordingView({
                             </div>
                         </div>
                     </div>
-                    ;{/* Bottom Controls Section */}
+                    {/* Bottom Controls Section */}
                     <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-6 flex-shrink-0">
                         {/* Media Playback Controls */}
                         <div className="flex items-center justify-center gap-8 md:gap-12">
