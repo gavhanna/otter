@@ -12,7 +12,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import './index.css';
 import { AppShell } from './components/AppShell';
-import { RecordingsPage } from './pages/RecordingsPage';
 import { RecentPage } from './pages/RecentPage';
 import { FavouritesPage } from './pages/FavouritesPage';
 import { LoginPage } from './pages/LoginPage';
@@ -96,7 +95,7 @@ const appLayoutRoute = createRoute({
 const recordingsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/',
-  component: RecordingsPage
+  component: () => null
 });
 
 const recentRoute = createRoute({

@@ -1,10 +1,10 @@
-import { useRecording } from '../components/AppShell';
+import { useNavigate } from '@tanstack/react-router';
 
 export function FavouritesPage() {
-  const { setRecordingMode } = useRecording();
+  const navigate = useNavigate();
 
   const handleNewRecording = () => {
-    setRecordingMode(true);
+    void navigate({ to: '/' });
   };
 
   return (

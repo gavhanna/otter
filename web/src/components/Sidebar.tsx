@@ -10,7 +10,7 @@ interface SidebarProps {
     selectedRecordingId: string | null;
     onRecordingSelect: (id: string | null) => void;
     currentPath: string;
-    onNewRecording: () => void;
+    onNewRecording: (options?: { autoStart?: boolean }) => void;
 }
 
 export function Sidebar({

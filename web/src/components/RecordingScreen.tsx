@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { formatDefaultRecordingName } from "../lib/utils";
@@ -12,11 +12,13 @@ const SUPPORTS_MEDIA_RECORDER =
     "MediaRecorder" in window;
 
 interface RecordingScreenProps {
-  onClose: () => void;
   onRecordingComplete: (recordingId: string) => void;
+  onClose?: () => void;
+  autoStartTrigger?: number | null;
+  onAutoStartConsumed?: () => void;
 }
 
-export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScreenProps) {
+export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger, onAutoStartConsumed }: RecordingScreenProps) {
     const queryClient = useQueryClient();
     const [state, setState] = useState<RecorderState>("idle");
     const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
         };
     }, [audioUrl]);
 
-    const startRecording = async () => {
+    const startRecording = useCallback(async () => {
         if (!SUPPORTS_MEDIA_RECORDER) {
             setError("Recording not supported in this browser.");
             return;
@@ -116,7 +118,14 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
             );
             cleanupMedia();
         }
-    };
+    }, [state]);
+
+    useEffect(() => {
+        if (autoStartTrigger && state === "idle") {
+            void startRecording();
+            onAutoStartConsumed?.();
+        }
+    }, [autoStartTrigger, state, startRecording, onAutoStartConsumed]);
 
     const pauseRecording = () => {
         if (recorderRef.current && recorderRef.current.state === "recording") {
@@ -198,7 +207,7 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
             await queryClient.invalidateQueries({ queryKey: ["recordings"] });
             onRecordingComplete(response.recording.id);
             resetRecorder();
-            onClose();
+            onClose?.();
         } catch (err) {
             setError(
                 err instanceof Error
@@ -212,6 +221,10 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
     const isSaving = state === "saving";
 
     const handleBack = () => {
+        if (!onClose) {
+            return;
+        }
+
         if (state === 'recording' || state === 'paused') {
             if (window.confirm('Are you sure you want to stop recording? Any unsaved audio will be lost.')) {
                 cleanupMedia();
@@ -227,14 +240,16 @@ export function RecordingScreen({ onClose, onRecordingComplete }: RecordingScree
         <div className="flex-1 flex flex-col bg-slate-950">
             <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-6 py-4">
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={handleBack}
-                        className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition-colors"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
+                    {onClose && (
+                        <button
+                            onClick={handleBack}
+                            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                    )}
                     <h1 className="text-xl font-semibold text-white">New Recording</h1>
                 </div>
             </header>

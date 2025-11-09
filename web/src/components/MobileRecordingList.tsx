@@ -5,7 +5,7 @@ import { useAuth } from "../lib/authStore";
 
 interface MobileRecordingListProps {
   onRecordingSelect: (id: string) => void;
-  onNewRecording: () => void;
+  onNewRecording: (options?: { autoStart?: boolean }) => void;
 }
 
 export function MobileRecordingList({ onRecordingSelect, onNewRecording }: MobileRecordingListProps) {
@@ -216,7 +216,7 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
           {/* Floating Record Button */}
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2">
               <button
-                  onClick={onNewRecording}
+                  onClick={() => onNewRecording({ autoStart: true })}
                   className="w-16 h-16 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
               >
                   <svg
