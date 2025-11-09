@@ -8,16 +8,16 @@ const UI_VERSION = packageJson.version ?? "0.0.0";
 
 interface SidebarProps {
     selectedRecordingId: string | null;
-    onRecordingSelect: (id: string | null) => void;
-    currentPath: string;
+    onRecordingSelect: (id: string) => void;
     onNewRecording: (options?: { autoStart?: boolean }) => void;
+    onCloseMobile?: () => void;
 }
 
 export function Sidebar({
     selectedRecordingId,
     onRecordingSelect,
-    currentPath,
     onNewRecording,
+    onCloseMobile,
 }: SidebarProps) {
     const { user, status } = useAuth();
     const [sidebarTab, setSidebarTab] = useState<"all" | "favourites">("all");
@@ -95,30 +95,38 @@ export function Sidebar({
         .sort(([a], [b]) => b.localeCompare(a))
         .map(([, group]) => group);
 
-    const isMainRecordingsView = currentPath === "/";
-
     return (
         <aside
-            className="hidden w-80 flex-col border-r border-slate-800 bg-slate-900 lg:flex"
+            className="flex w-full flex-col border-b border-slate-800 bg-slate-900 md:h-screen md:w-80 md:border-b-0 md:border-r"
             style={{ maxHeight: "100dvh" }}
         >
             <div className="p-4 border-b border-slate-800">
-                <div className="mb-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-slate-900 font-semibold">
-                        OR
-                    </div>
-                    <div>
-                        <div className="text-lg font-semibold">
-                            Otter Recorder
+                <div className="mb-6 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-slate-900 font-semibold">
+                            OR
                         </div>
-                        <div className="text-sm text-slate-400">
-                            Your private audio library
+                        <div>
+                            <div className="text-lg font-semibold">
+                                Otter Recorder
+                            </div>
+                            <div className="text-sm text-slate-400">
+                                Your private audio library
+                            </div>
                         </div>
                     </div>
+                    {onCloseMobile && (
+                        <button
+                            onClick={onCloseMobile}
+                            className="md:hidden rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
+                        >
+                            Close
+                        </button>
+                    )}
                 </div>
 
                 <button
-                    onClick={onNewRecording}
+                    onClick={() => onNewRecording({ autoStart: true })}
                     className="flex w-full items-center gap-3 rounded-lg px-3 py-2 mt-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
                 >
                     <svg

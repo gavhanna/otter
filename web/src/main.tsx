@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
   Outlet,
@@ -11,11 +11,13 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import './index.css';
-import { AppShell } from './components/AppShell';
+import { AppShell, useMobileSidebar } from './components/AppShell';
 import { RecentPage } from './pages/RecentPage';
 import { FavouritesPage } from './pages/FavouritesPage';
 import { LoginPage } from './pages/LoginPage';
 import { AuthProvider, useAuth } from './lib/authStore';
+import { RecordingScreen } from './components/RecordingScreen';
+import { RecordingView } from './components/RecordingView';
 
 // Auth guard component for protected routes
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -95,7 +97,16 @@ const appLayoutRoute = createRoute({
 const recordingsRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
   path: '/',
-  component: () => null
+  validateSearch: (search: Record<string, unknown>) => ({
+    autoStart: search?.autoStart === true || search?.autoStart === 'true'
+  }),
+  component: RecorderRouteComponent
+});
+
+const recordingDetailRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: '/recording/$recordingId',
+  component: RecordingDetailRouteComponent
 });
 
 const recentRoute = createRoute({
@@ -112,7 +123,7 @@ const favouritesRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   authLayoutRoute.addChildren([loginRoute]),
-  appLayoutRoute.addChildren([recordingsRoute, recentRoute, favouritesRoute])
+  appLayoutRoute.addChildren([recordingsRoute, recordingDetailRoute, recentRoute, favouritesRoute])
 ]);
 
 const router = createRouter({
@@ -134,3 +145,48 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+function RecorderRouteComponent() {
+  const navigate = useNavigate();
+  const { openSidebar } = useMobileSidebar();
+  const search = recordingsRoute.useSearch();
+  const autoStartTrigger = useMemo(() => (search.autoStart ? Date.now() : null), [search.autoStart]);
+
+  const handleRecordingComplete = (recordingId: string) => {
+    void navigate({ to: '/recording/$recordingId', params: { recordingId } });
+  };
+
+  const handleAutoStartConsumed = () => {
+    if (search.autoStart) {
+      void navigate({ to: '/', replace: true, search: { autoStart: false } });
+    }
+  };
+
+  return (
+    <RecordingScreen
+      autoStartTrigger={autoStartTrigger}
+      onAutoStartConsumed={handleAutoStartConsumed}
+      onRecordingComplete={handleRecordingComplete}
+      onClose={openSidebar}
+    />
+  );
+}
+
+function RecordingDetailRouteComponent() {
+  const navigate = useNavigate();
+  const params = recordingDetailRoute.useParams();
+  const { openSidebar } = useMobileSidebar();
+
+  return (
+      <RecordingView
+          recordingId={params.recordingId}
+          onRecordingDeleted={() => {
+              openSidebar();
+              void navigate({ to: "/" });
+          }}
+          onClose={() => {
+              navigate({ to: "/" });
+          }}
+      />
+  );
+}

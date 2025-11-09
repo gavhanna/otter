@@ -4,7 +4,7 @@ export function FavouritesPage() {
   const navigate = useNavigate();
 
   const handleNewRecording = () => {
-    void navigate({ to: '/' });
+    void navigate({ to: '/', search: { autoStart: true } });
   };
 
   return (

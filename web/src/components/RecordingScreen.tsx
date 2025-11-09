@@ -220,53 +220,40 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
 
     const isSaving = state === "saving";
 
-    const handleBack = () => {
-        if (!onClose) {
-            return;
-        }
-
-        if (state === 'recording' || state === 'paused') {
-            if (window.confirm('Are you sure you want to stop recording? Any unsaved audio will be lost.')) {
-                cleanupMedia();
-                setState('idle');
-                onClose();
-            }
-        } else {
-            onClose();
-        }
-    };
-
     return (
         <div className="flex-1 flex flex-col bg-slate-950">
-            <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-6 py-4">
-                <div className="flex items-center gap-4">
-                    {onClose && (
-                        <button
-                            onClick={handleBack}
-                            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition-colors"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                    )}
-                    <h1 className="text-xl font-semibold text-white">New Recording</h1>
-                </div>
-            </header>
-
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto w-full">
                 <div className="max-w-2xl mx-auto p-6 space-y-8">
                     {/* Main Recording Interface */}
                     <div className="bg-slate-900/70 rounded-3xl border border-slate-800 p-8">
                         <div className="text-center space-y-8">
                             {/* Recording Status */}
                             <div className="space-y-4">
-                                {(state === "recording" || state === "paused") && (
+                                {(state === "recording" ||
+                                    state === "paused") && (
                                     <div className="space-y-6">
                                         <div className="flex items-center justify-center gap-3">
-                                            <div className={`w-3 h-3 rounded-full ${state === "recording" ? "bg-rose-500 animate-pulse" : "bg-amber-500 animate-none"} ${state === "paused" ? "animate-bounce" : ""}`}></div>
-                                            <span className={`${state === "recording" ? "text-rose-400" : "text-amber-400"} font-medium transition-colors duration-300`}>
-                                                {state === "recording" ? "Recording" : "Paused"}
+                                            <div
+                                                className={`w-3 h-3 rounded-full ${
+                                                    state === "recording"
+                                                        ? "bg-rose-500 animate-pulse"
+                                                        : "bg-amber-500 animate-none"
+                                                } ${
+                                                    state === "paused"
+                                                        ? "animate-bounce"
+                                                        : ""
+                                                }`}
+                                            ></div>
+                                            <span
+                                                className={`${
+                                                    state === "recording"
+                                                        ? "text-rose-400"
+                                                        : "text-amber-400"
+                                                } font-medium transition-colors duration-300`}
+                                            >
+                                                {state === "recording"
+                                                    ? "Recording"
+                                                    : "Paused"}
                                             </span>
                                         </div>
                                         <div className="text-6xl font-mono font-bold text-white">
@@ -277,17 +264,39 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                         {visualizerData && (
                                             <div className="bg-slate-950/60 rounded-2xl p-4 border border-slate-700">
                                                 <div className="flex items-center justify-center gap-1 h-24">
-                                                    {Array.from({ length: Math.min(32, visualizerData.length) }).map((_, i) => {
-                                                        const value = visualizerData[i * Math.floor(visualizerData.length / 32)] || 0;
-                                                        const height = Math.max(4, (value / 255) * 96); // Max height 96px (24 * 4)
+                                                    {Array.from({
+                                                        length: Math.min(
+                                                            32,
+                                                            visualizerData.length
+                                                        ),
+                                                    }).map((_, i) => {
+                                                        const value =
+                                                            visualizerData[
+                                                                i *
+                                                                    Math.floor(
+                                                                        visualizerData.length /
+                                                                            32
+                                                                    )
+                                                            ] || 0;
+                                                        const height = Math.max(
+                                                            4,
+                                                            (value / 255) * 96
+                                                        ); // Max height 96px (24 * 4)
                                                         return (
                                                             <div
                                                                 key={i}
-                                                                className={`flex-1 bg-gradient-to-t from-brand to-orange-400 rounded-full transition-all duration-100 ${state === "paused" ? "opacity-50" : ""}`}
+                                                                className={`flex-1 bg-gradient-to-t from-brand to-orange-400 rounded-full transition-all duration-100 ${
+                                                                    state ===
+                                                                    "paused"
+                                                                        ? "opacity-50"
+                                                                        : ""
+                                                                }`}
                                                                 style={{
                                                                     height: `${height}px`,
-                                                                    minHeight: '4px',
-                                                                    maxHeight: '96px'
+                                                                    minHeight:
+                                                                        "4px",
+                                                                    maxHeight:
+                                                                        "96px",
                                                                 }}
                                                             />
                                                         );
@@ -302,12 +311,32 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                     <div className="space-y-4">
                                         <div className="w-32 h-32 mx-auto rounded-full bg-slate-800 flex items-center justify-center">
                                             {state === "idle" ? (
-                                                <svg className="w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                                <svg
+                                                    className="w-12 h-12 text-slate-600"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                                                    />
                                                 </svg>
                                             ) : (
-                                                <svg className="w-12 h-12 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                                                <svg
+                                                    className="w-12 h-12 text-brand"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                                                    />
                                                 </svg>
                                             )}
                                         </div>
@@ -323,7 +352,11 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                             {/* Audio Preview */}
                             {state === "preview" && audioUrl && (
                                 <div className="bg-slate-950/60 rounded-2xl p-6 border border-slate-800">
-                                    <audio controls src={audioUrl} className="w-full" />
+                                    <audio
+                                        controls
+                                        src={audioUrl}
+                                        className="w-full"
+                                    />
                                 </div>
                             )}
 
@@ -334,7 +367,11 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                         onClick={startRecording}
                                         className="w-20 h-20 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95 group"
                                     >
-                                        <svg className="w-8 h-8 transition-transform duration-200 group-hover:scale-110" fill="currentColor" viewBox="0 0 24 24">
+                                        <svg
+                                            className="w-8 h-8 transition-transform duration-200 group-hover:scale-110"
+                                            fill="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
                                             <circle cx="12" cy="12" r="8" />
                                         </svg>
                                     </button>
@@ -346,17 +383,43 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                             onClick={pauseRecording}
                                             className="w-16 h-16 rounded-full bg-amber-500 text-white hover:bg-amber-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
                                         >
-                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                                <rect x="6" y="4" width="4" height="16" rx="1" />
-                                                <rect x="14" y="4" width="4" height="16" rx="1" />
+                                            <svg
+                                                className="w-6 h-6"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <rect
+                                                    x="6"
+                                                    y="4"
+                                                    width="4"
+                                                    height="16"
+                                                    rx="1"
+                                                />
+                                                <rect
+                                                    x="14"
+                                                    y="4"
+                                                    width="4"
+                                                    height="16"
+                                                    rx="1"
+                                                />
                                             </svg>
                                         </button>
                                         <button
                                             onClick={stopRecording}
                                             className="w-20 h-20 rounded-full bg-rose-500 text-white hover:bg-rose-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
                                         >
-                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                                                <rect x="8" y="8" width="8" height="8" rx="1" />
+                                            <svg
+                                                className="w-8 h-8"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <rect
+                                                    x="8"
+                                                    y="8"
+                                                    width="8"
+                                                    height="8"
+                                                    rx="1"
+                                                />
                                             </svg>
                                         </button>
                                     </div>
@@ -368,16 +431,30 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                             onClick={resumeRecording}
                                             className="w-16 h-16 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95 animate-pulse"
                                         >
-                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M8 5v14l11-7z"/>
+                                            <svg
+                                                className="w-6 h-6"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path d="M8 5v14l11-7z" />
                                             </svg>
                                         </button>
                                         <button
                                             onClick={stopRecording}
                                             className="w-20 h-20 rounded-full bg-rose-500 text-white hover:bg-rose-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
                                         >
-                                            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                                                <rect x="8" y="8" width="8" height="8" rx="1" />
+                                            <svg
+                                                className="w-8 h-8"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <rect
+                                                    x="8"
+                                                    y="8"
+                                                    width="8"
+                                                    height="8"
+                                                    rx="1"
+                                                />
                                             </svg>
                                         </button>
                                     </div>
@@ -397,7 +474,9 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                             disabled={isSaving}
                                             className="px-8 py-3 rounded-xl bg-brand text-slate-950 hover:bg-orange-400 font-semibold disabled:opacity-50 transition-colors"
                                         >
-                                            {isSaving ? "Saving..." : "Save Recording"}
+                                            {isSaving
+                                                ? "Saving..."
+                                                : "Save Recording"}
                                         </button>
                                     </>
                                 )}
@@ -407,11 +486,15 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                             {state === "preview" && (
                                 <div className="max-w-md mx-auto">
                                     <label className="block text-left">
-                                        <span className="text-sm font-medium text-slate-300">Title</span>
+                                        <span className="text-sm font-medium text-slate-300">
+                                            Title
+                                        </span>
                                         <input
                                             type="text"
                                             value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
+                                            onChange={(e) =>
+                                                setTitle(e.target.value)
+                                            }
                                             className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
                                             placeholder="Morning ideas, Grocery note…"
                                         />
@@ -425,9 +508,12 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                                     <div className="flex flex-col items-center space-y-4">
                                         <div className="w-12 h-12 border-4 border-slate-600 border-t-brand rounded-full animate-spin"></div>
                                         <div>
-                                            <h3 className="text-lg font-semibold text-white mb-2">Saving Recording</h3>
+                                            <h3 className="text-lg font-semibold text-white mb-2">
+                                                Saving Recording
+                                            </h3>
                                             <p className="text-sm text-slate-400">
-                                                This may take a moment for longer recordings...
+                                                This may take a moment for
+                                                longer recordings...
                                             </p>
                                         </div>
                                     </div>
@@ -446,42 +532,8 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                     {/* Browser Support Notice */}
                     {!SUPPORTS_MEDIA_RECORDER && (
                         <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 py-4 text-sm text-amber-200">
-                            Recording requires a modern browser with MediaRecorder support.
-                        </div>
-                    )}
-
-                    {/* Instructions */}
-                    {state === "idle" && (
-                        <div className="text-center space-y-6">
-                            <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700">
-                                <h3 className="text-lg font-semibold text-white mb-4">Getting Started</h3>
-                                <div className="space-y-3 text-sm text-slate-300">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
-                                            <span className="text-brand font-semibold text-sm">1</span>
-                                        </div>
-                                        <p>Click the orange button to start recording</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
-                                            <span className="text-brand font-semibold text-sm">2</span>
-                                        </div>
-                                        <p>Speak clearly into your microphone</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
-                                            <span className="text-brand font-semibold text-sm">3</span>
-                                        </div>
-                                        <p>Use pause button to take breaks</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
-                                            <span className="text-brand font-semibold text-sm">4</span>
-                                        </div>
-                                        <p>Click stop when finished and save your recording</p>
-                                    </div>
-                                </div>
-                            </div>
+                            Recording requires a modern browser with
+                            MediaRecorder support.
                         </div>
                     )}
                 </div>

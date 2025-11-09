@@ -613,298 +613,278 @@ export function RecordingView({
                 </div>
             </header>
 
-            <div className="flex-1 flex flex-col h-full min-h-0">
-                {/* Google Recorder Style Full Height Layout */}
-                <div className="flex-1 flex flex-col bg-slate-900/30 relative min-h-0">
-                    {/* Recording Title and Info */}
-                    <div className="px-6 pt-6 pb-4 bg-slate-900/50 backdrop-blur-sm border-b border-slate-800/30">
-                        {isEditingTitle ? (
-                            <div className="flex flex-col gap-3 max-w-4xl mx-auto">
-                                <input
-                                    type="text"
-                                    value={editTitle}
-                                    onChange={(e) =>
-                                        setEditTitle(e.target.value)
+            {/* <div className="flex-1 flex flex-col h-full min-h-0"> */}
+            {/* Google Recorder Style Full Height Layout */}
+            <div className="flex-1 flex flex-col bg-slate-900/30 relative min-h-0">
+                {/* Recording Title and Info */}
+                <div className="px-6 pt-6 pb-4 bg-slate-900/50 backdrop-blur-sm border-b border-slate-800/30">
+                    {isEditingTitle ? (
+                        <div className="flex flex-col gap-3 max-w-4xl mx-auto">
+                            <input
+                                type="text"
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                disabled={isUpdating}
+                                className="text-2xl md:text-3xl font-bold text-white bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 focus:outline-none focus:border-brand w-full"
+                                placeholder="Recording title..."
+                                autoFocus
+                            />
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={handleSaveTitle}
+                                    disabled={
+                                        isUpdating || editTitle.trim() === ""
                                     }
-                                    onKeyDown={handleKeyDown}
+                                    className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-6 py-2 text-sm font-medium hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {isUpdating ? (
+                                        <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin"></div>
+                                    ) : (
+                                        "Save"
+                                    )}
+                                </button>
+                                <button
+                                    onClick={handleCancelEditTitle}
                                     disabled={isUpdating}
-                                    className="text-2xl md:text-3xl font-bold text-white bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 focus:outline-none focus:border-brand w-full"
-                                    placeholder="Recording title..."
-                                    autoFocus
-                                />
-                                <div className="flex gap-3 justify-center">
-                                    <button
-                                        onClick={handleSaveTitle}
-                                        disabled={
-                                            isUpdating ||
-                                            editTitle.trim() === ""
-                                        }
-                                        className="rounded-lg border border-green-700 bg-green-900/20 text-green-400 px-6 py-2 text-sm font-medium hover:bg-green-900/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        {isUpdating ? (
-                                            <div className="w-4 h-4 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin"></div>
-                                        ) : (
-                                            "Save"
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={handleCancelEditTitle}
-                                        disabled={isUpdating}
-                                        className="rounded-lg border border-slate-700 text-slate-300 px-6 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="max-w-4xl mx-auto text-center">
-                                <h1
-                                    className="text-2xl md:text-3xl font-bold text-white cursor-pointer hover:text-brand transition-colors mb-2"
-                                    onClick={handleStartEditTitle}
-                                    title="Click to edit title"
+                                    className="rounded-lg border border-slate-700 text-slate-300 px-6 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    {recording.title}
-                                </h1>
-                                <p className="text-sm text-slate-400">
-                                    {formatDate(
-                                        recording.recordedAt ??
-                                            recording.createdAt
-                                    )}{" "}
-                                    • {formatDuration(recording.durationMs)}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                    {/* Main Waveform Area - Takes up most of the space */}
-                    <div className="flex-1 relative bg-slate-950/60 overflow-hidden">
-                        {/* Waveform Display */}
-                        <div className="relative h-full flex items-center justify-center p-8">
-                            <div
-                                ref={waveformRef}
-                                className="w-full max-w-4xl mx-auto cursor-pointer group"
-                                onClick={(e) => {
-                                    if (
-                                        wavesurferRef.current &&
-                                        isWaveformReady
-                                    ) {
-                                        // Check if clicking on waveform itself (not just the container)
-                                        if (
-                                            e.target === waveformRef.current ||
-                                            waveformRef.current?.contains(
-                                                e.target as Node
-                                            )
-                                        ) {
-                                            const rect =
-                                                waveformRef.current.getBoundingClientRect();
-                                            const percent =
-                                                (e.clientX - rect.left) /
-                                                rect.width;
-                                            const duration =
-                                                wavesurferRef.current.getDuration();
-                                            console.log("Waveform click:", {
-                                                percent,
-                                                duration,
-                                                seekTo: percent,
-                                            });
-                                            wavesurferRef.current.seekTo(
-                                                percent
-                                            );
-                                        } else {
-                                            // Toggle play/pause when clicking container but not waveform
-                                            if (isPlaying) {
-                                                wavesurferRef.current.pause();
-                                            } else {
-                                                wavesurferRef.current.play();
-                                            }
-                                        }
-                                    }
-                                }}
-                            >
-                                {!isWaveformReady && audioSrc && (
-                                    <div className="flex items-center justify-center h-full">
-                                        <div className="flex items-center gap-3 text-slate-500">
-                                            <div className="w-6 h-6 border-2 border-slate-600 border-t-orange-500 rounded-full animate-spin"></div>
-                                            <span className="text-lg">
-                                                Loading waveform...
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                                {!audioSrc && (
-                                    <div className="flex items-center justify-center h-full">
-                                        <p className="text-slate-500 text-lg">
-                                            No audio available
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Volume Control - Top right, visible on hover */}
-                            <div className="absolute top-8 right-8 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-2">
-                                <svg
-                                    className="w-5 h-5 text-white/80"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
-                                    />
-                                </svg>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.01"
-                                    value={volume}
-                                    onChange={(e) => {
-                                        const newVolume = parseFloat(
-                                            e.target.value
-                                        );
-                                        setVolume(newVolume);
-                                        if (wavesurferRef.current) {
-                                            wavesurferRef.current.setVolume(
-                                                newVolume
-                                            );
-                                        }
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="w-24 h-1 accent-orange-500 cursor-pointer"
-                                />
+                                    Cancel
+                                </button>
                             </div>
                         </div>
-                    </div>
-                    {/* Bottom Controls Section */}
-                    <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-6 flex-shrink-0">
-                        {/* Media Playback Controls */}
-                        <div className="flex items-center justify-center gap-8 md:gap-12">
-                            {/* Skip Backward 10s Button */}
-                            <button
-                                onClick={() => {
-                                    if (
-                                        wavesurferRef.current &&
-                                        isWaveformReady
-                                    ) {
-                                        wavesurferRef.current.skip(-5);
-                                    }
-                                }}
-                                disabled={!isWaveformReady}
-                                className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
-                                title="Skip backward 5 seconds"
+                    ) : (
+                        <div className="max-w-4xl mx-auto text-center">
+                            <h1
+                                className="text-2xl md:text-3xl font-bold text-white cursor-pointer hover:text-brand transition-colors mb-2"
+                                onClick={handleStartEditTitle}
+                                title="Click to edit title"
                             >
-                                <svg
-                                    className="w-6 h-6 md:w-5 md:h-5"
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
-                                </svg>
-                            </button>
-                            {/* Play/Pause Button */}
-                            <button
-                                onClick={() => {
+                                {recording.title}
+                            </h1>
+                            <p className="text-sm text-slate-400">
+                                {formatDate(
+                                    recording.recordedAt ?? recording.createdAt
+                                )}{" "}
+                                • {formatDuration(recording.durationMs)}
+                            </p>
+                        </div>
+                    )}
+                </div>
+                {/* Main Waveform Area - Takes up most of the space */}
+                <div className="flex-1 relative bg-slate-950/60 overflow-hidden">
+                    {/* Waveform Display */}
+                    <div className="relative h-full flex items-center justify-center p-8">
+                        <div
+                            ref={waveformRef}
+                            className="w-full max-w-4xl mx-auto cursor-pointer group"
+                            onClick={(e) => {
+                                if (wavesurferRef.current && isWaveformReady) {
+                                    // Check if clicking on waveform itself (not just the container)
                                     if (
-                                        wavesurferRef.current &&
-                                        isWaveformReady
+                                        e.target === waveformRef.current ||
+                                        waveformRef.current?.contains(
+                                            e.target as Node
+                                        )
                                     ) {
+                                        const rect =
+                                            waveformRef.current.getBoundingClientRect();
+                                        const percent =
+                                            (e.clientX - rect.left) /
+                                            rect.width;
+                                        const duration =
+                                            wavesurferRef.current.getDuration();
+                                        console.log("Waveform click:", {
+                                            percent,
+                                            duration,
+                                            seekTo: percent,
+                                        });
+                                        wavesurferRef.current.seekTo(percent);
+                                    } else {
+                                        // Toggle play/pause when clicking container but not waveform
                                         if (isPlaying) {
                                             wavesurferRef.current.pause();
                                         } else {
                                             wavesurferRef.current.play();
                                         }
                                     }
-                                }}
-                                disabled={!isWaveformReady}
-                                className="w-24 h-24 md:w-20 md:h-20 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-105 active:scale-95"
+                                }
+                            }}
+                        >
+                            {!isWaveformReady && audioSrc && (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="flex items-center gap-3 text-slate-500">
+                                        <div className="w-6 h-6 border-2 border-slate-600 border-t-orange-500 rounded-full animate-spin"></div>
+                                        <span className="text-lg">
+                                            Loading waveform...
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {!audioSrc && (
+                                <div className="flex items-center justify-center h-full">
+                                    <p className="text-slate-500 text-lg">
+                                        No audio available
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Volume Control - Top right, visible on hover */}
+                        <div className="absolute top-8 right-8 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-2">
+                            <svg
+                                className="w-5 h-5 text-white/80"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
                             >
-                                {isPlaying ? (
-                                    <svg
-                                        className="w-10 h-10 md:w-8 md:h-8"
-                                        fill="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                                    </svg>
-                                ) : (
-                                    <svg
-                                        className="w-10 h-10 md:w-8 md:h-8 ml-1"
-                                        fill="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path d="M8 5v14l11-7z" />
-                                    </svg>
-                                )}
-                            </button>
-                            {/* Skip Forward 10s Button */}
-                            <button
-                                onClick={() => {
-                                    if (
-                                        wavesurferRef.current &&
-                                        isWaveformReady
-                                    ) {
-                                        wavesurferRef.current.skip(10);
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"
+                                />
+                            </svg>
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={volume}
+                                onChange={(e) => {
+                                    const newVolume = parseFloat(
+                                        e.target.value
+                                    );
+                                    setVolume(newVolume);
+                                    if (wavesurferRef.current) {
+                                        wavesurferRef.current.setVolume(
+                                            newVolume
+                                        );
                                     }
                                 }}
-                                disabled={!isWaveformReady}
-                                className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
-                                title="Skip forward 10 seconds"
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-24 h-1 accent-orange-500 cursor-pointer"
+                            />
+                        </div>
+                    </div>
+                </div>
+                {/* Bottom Controls Section */}
+                <div className="bg-slate-900/80 backdrop-blur-sm border-t border-slate-800/50 p-6 flex-shrink-0">
+                    {/* Media Playback Controls */}
+                    <div className="flex items-center justify-center gap-8 md:gap-12">
+                        {/* Skip Backward 10s Button */}
+                        <button
+                            onClick={() => {
+                                if (wavesurferRef.current && isWaveformReady) {
+                                    wavesurferRef.current.skip(-5);
+                                }
+                            }}
+                            disabled={!isWaveformReady}
+                            className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                            title="Skip backward 5 seconds"
+                        >
+                            <svg
+                                className="w-6 h-6 md:w-5 md:h-5"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
                             >
+                                <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z" />
+                            </svg>
+                        </button>
+                        {/* Play/Pause Button */}
+                        <button
+                            onClick={() => {
+                                if (wavesurferRef.current && isWaveformReady) {
+                                    if (isPlaying) {
+                                        wavesurferRef.current.pause();
+                                    } else {
+                                        wavesurferRef.current.play();
+                                    }
+                                }
+                            }}
+                            disabled={!isWaveformReady}
+                            className="w-24 h-24 md:w-20 md:h-20 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-105 active:scale-95"
+                        >
+                            {isPlaying ? (
                                 <svg
-                                    className="w-6 h-6 md:w-5 md:h-5"
+                                    className="w-10 h-10 md:w-8 md:h-8"
                                     fill="currentColor"
                                     viewBox="0 0 24 24"
                                 >
-                                    <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
+                                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
                                 </svg>
-                            </button>
+                            ) : (
+                                <svg
+                                    className="w-10 h-10 md:w-8 md:h-8 ml-1"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path d="M8 5v14l11-7z" />
+                                </svg>
+                            )}
+                        </button>
+                        {/* Skip Forward 10s Button */}
+                        <button
+                            onClick={() => {
+                                if (wavesurferRef.current && isWaveformReady) {
+                                    wavesurferRef.current.skip(10);
+                                }
+                            }}
+                            disabled={!isWaveformReady}
+                            className="w-16 h-16 md:w-14 md:h-14 rounded-full bg-slate-700/80 text-white flex items-center justify-center hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                            title="Skip forward 10 seconds"
+                        >
+                            <svg
+                                className="w-6 h-6 md:w-5 md:h-5"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Speed Control and Time Display */}
+                    <div className="flex items-center justify-between mt-6 px-4">
+                        {/* Speed Control */}
+                        <div className="flex items-center gap-3">
+                            <label
+                                htmlFor="playback-speed"
+                                className="text-sm text-slate-400 sr-only"
+                            >
+                                Speed:
+                            </label>
+                            <select
+                                id="playback-speed"
+                                value={playbackSpeed}
+                                onChange={(e) =>
+                                    setPlaybackSpeed(parseFloat(e.target.value))
+                                }
+                                disabled={!isWaveformReady}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-slate-800 text-white border border-slate-600 focus:border-brand focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer`}
+                            >
+                                <option value={0.5}>0.5x</option>
+                                <option value={0.75}>0.75x</option>
+                                <option value={1}>1x</option>
+                                <option value={1.25}>1.25x</option>
+                                <option value={1.5}>1.5x</option>
+                                <option value={2}>2x</option>
+                            </select>
                         </div>
 
-                        {/* Speed Control and Time Display */}
-                        <div className="flex items-center justify-between mt-6 px-4">
-                            {/* Speed Control */}
-                            <div className="flex items-center gap-3">
-                                <label
-                                    htmlFor="playback-speed"
-                                    className="text-sm text-slate-400 sr-only"
-                                >
-                                    Speed:
-                                </label>
-                                <select
-                                    id="playback-speed"
-                                    value={playbackSpeed}
-                                    onChange={(e) =>
-                                        setPlaybackSpeed(
-                                            parseFloat(e.target.value)
-                                        )
-                                    }
-                                    disabled={!isWaveformReady}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 bg-slate-800 text-white border border-slate-600 focus:border-brand focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer`}
-                                >
-                                    <option value={0.5}>0.5x</option>
-                                    <option value={0.75}>0.75x</option>
-                                    <option value={1}>1x</option>
-                                    <option value={1.25}>1.25x</option>
-                                    <option value={1.5}>1.5x</option>
-                                    <option value={2}>2x</option>
-                                </select>
-                            </div>
-
-                            {/* Time Display */}
-                            <div className="text-white/90 font-mono text-lg">
-                                {formatTime(currentTime)} /{" "}
-                                {formatTime(
-                                    recording?.durationMs
-                                        ? recording.durationMs / 1000
-                                        : 0
-                                )}
-                            </div>
+                        {/* Time Display */}
+                        <div className="text-white/90 font-mono text-lg">
+                            {formatTime(currentTime)} /{" "}
+                            {formatTime(
+                                recording?.durationMs
+                                    ? recording.durationMs / 1000
+                                    : 0
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+            {/* </div> */}
 
             {/* Delete Confirmation Dialog */}
             {showDeleteConfirm && (
