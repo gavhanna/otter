@@ -12,13 +12,18 @@ const SUPPORTS_MEDIA_RECORDER =
     "MediaRecorder" in window;
 
 interface RecordingScreenProps {
-  onRecordingComplete: (recordingId: string) => void;
-  onClose?: () => void;
-  autoStartTrigger?: number | null;
-  onAutoStartConsumed?: () => void;
+    onRecordingComplete: (recordingId: string) => void;
+    onClose?: () => void;
+    autoStartTrigger?: number | null;
+    onAutoStartConsumed?: () => void;
 }
 
-export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger, onAutoStartConsumed }: RecordingScreenProps) {
+export function RecordingScreen({
+    onClose,
+    onRecordingComplete,
+    autoStartTrigger,
+    onAutoStartConsumed,
+}: RecordingScreenProps) {
     const queryClient = useQueryClient();
     const [state, setState] = useState<RecorderState>("idle");
     const [error, setError] = useState<string | null>(null);
@@ -26,13 +31,15 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
     const [durationMs, setDurationMs] = useState<number>(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const [visualizerData, setVisualizerData] = useState<Uint8Array | null>(null);
+    const [visualizerData, setVisualizerData] = useState<Uint8Array | null>(
+        null
+    );
 
     const recorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const startTimeRef = useRef<number>(0);
     const chunksRef = useRef<Blob[]>([]);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const intervalRef = useRef<number | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const dataArrayRef = useRef<Uint8Array | null>(null);
@@ -85,7 +92,8 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
                 });
 
                 // Use the current duration which should be accurate
-                const finalDuration = Date.now() - recordingStartTimeRef.current;
+                const finalDuration =
+                    Date.now() - recordingStartTimeRef.current;
                 setDurationMs(finalDuration);
 
                 setState("preview");
@@ -160,7 +168,11 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
     };
 
     const stopRecording = () => {
-        if (recorderRef.current && (recorderRef.current.state === "recording" || recorderRef.current.state === "paused")) {
+        if (
+            recorderRef.current &&
+            (recorderRef.current.state === "recording" ||
+                recorderRef.current.state === "paused")
+        ) {
             recorderRef.current.stop();
             setState("preview");
 
@@ -543,11 +555,13 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
 
     function setupAudioVisualizer(stream: MediaStream) {
         try {
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            audioContextRef.current = new (window.AudioContext ||
+                (window as any).webkitAudioContext)();
             analyserRef.current = audioContextRef.current.createAnalyser();
             analyserRef.current.fftSize = 256;
 
-            const source = audioContextRef.current.createMediaStreamSource(stream);
+            const source =
+                audioContextRef.current.createMediaStreamSource(stream);
             source.connect(analyserRef.current);
 
             const bufferLength = analyserRef.current.frequencyBinCount;
@@ -555,14 +569,14 @@ export function RecordingScreen({ onClose, onRecordingComplete, autoStartTrigger
 
             visualize();
         } catch (error) {
-            console.warn('Audio visualizer setup failed:', error);
+            console.warn("Audio visualizer setup failed:", error);
         }
     }
 
     function visualize() {
         if (!analyserRef.current || !dataArrayRef.current) return;
 
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+        analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
         setVisualizerData(new Uint8Array(dataArrayRef.current));
 
         animationRef.current = requestAnimationFrame(visualize);
