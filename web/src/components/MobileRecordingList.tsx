@@ -89,111 +89,146 @@ export function MobileRecordingList({ onRecordingSelect, onNewRecording }: Mobil
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-slate-800 bg-slate-900/80 backdrop-blur">
-        <div className="px-4 py-3">
-          <h1 className="text-xl font-semibold text-white">Recordings</h1>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex px-2 pb-2">
-          {[
-            { id: "all", label: "All" },
-            { id: "favourites", label: "Favorites" }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === tab.id
-                  ? "bg-brand text-slate-950"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Recording List */}
-      <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="p-4 text-center text-slate-400">
-            Loading recordings...
-          </div>
-        ) : error ? (
-          <div className="p-4 text-center text-rose-400">
-            Failed to load recordings
-          </div>
-        ) : sortedRecordings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-white mb-2">No recordings yet</h3>
-            <p className="text-slate-400 mb-6">Tap the record button to create your first recording</p>
-          </div>
-        ) : (
-          <div>
-            {sortedGroups.map((group) => (
-              <div key={group.monthLabel}>
-                {/* Month header */}
-                <div className="px-4 py-2 bg-slate-900/60 sticky top-0 z-10 border-b border-slate-800">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    {group.monthLabel}
-                  </h3>
-                </div>
-
-                {/* Recordings for this month */}
-                <div className="divide-y divide-slate-800">
-                  {group.recordings.map((recording) => (
-                    <button
-                      key={recording.id}
-                      onClick={() => onRecordingSelect(recording.id)}
-                      className="w-full px-4 py-3 text-left hover:bg-slate-800/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-white truncate">
-                            {recording.title}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-                            <span>{formatDate(recording.recordedAt || recording.createdAt)}</span>
-                            <span>•</span>
-                            <span>{formatDuration(recording.durationMs)}</span>
-                          </div>
-                        </div>
-                        {recording.isFavourited && (
-                          <svg className="w-4 h-4 text-brand flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                          </svg>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+      <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex-shrink-0 border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+              <div className="px-4 py-3">
+                  <h1 className="text-xl font-semibold text-white">
+                      Recordings
+                  </h1>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Floating Record Button */}
-      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-        <button
-          onClick={onNewRecording}
-          className="w-16 h-16 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
-        >
-          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" />
-          </svg>
-        </button>
+              {/* Tabs */}
+              <div className="flex px-2 pb-2">
+                  {[
+                      { id: "all", label: "All" },
+                      { id: "favourites", label: "Favorites" },
+                  ].map((tab) => (
+                      <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id as any)}
+                          className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              activeTab === tab.id
+                                  ? "bg-brand text-slate-950"
+                                  : "text-slate-400 hover:text-white hover:bg-slate-800"
+                          }`}
+                      >
+                          {tab.label}
+                      </button>
+                  ))}
+              </div>
+          </div>
+
+          {/* Recording List */}
+          <div className="flex-1 overflow-y-auto">
+              {isLoading ? (
+                  <div className="p-4 text-center text-slate-400">
+                      Loading recordings...
+                  </div>
+              ) : error ? (
+                  <div className="p-4 text-center text-rose-400">
+                      Failed to load recordings
+                  </div>
+              ) : sortedRecordings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                      <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
+                          <svg
+                              className="w-8 h-8 text-slate-600"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                          >
+                              <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                              />
+                          </svg>
+                      </div>
+                      <h3 className="text-lg font-medium text-white mb-2">
+                          No recordings yet
+                      </h3>
+                      <p className="text-slate-400 mb-6">
+                          Tap the record button to create your first recording
+                      </p>
+                  </div>
+              ) : (
+                  <div>
+                      {sortedGroups.map((group) => (
+                          <div key={group.monthLabel}>
+                              {/* Month header */}
+                              <div className="px-4 py-2 bg-slate-900/60 sticky top-0 z-10 border-b border-slate-800">
+                                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                      {group.monthLabel}
+                                  </h3>
+                              </div>
+
+                              {/* Recordings for this month */}
+                              <div className="divide-y divide-slate-800">
+                                  {group.recordings.map((recording) => (
+                                      <button
+                                          key={recording.id}
+                                          onClick={() =>
+                                              onRecordingSelect(recording.id)
+                                          }
+                                          className="w-full px-4 py-3 text-left hover:bg-slate-800/50 transition-colors"
+                                      >
+                                          <div className="flex items-start justify-between">
+                                              <div className="flex-1 min-w-0">
+                                                  <h3 className="font-medium text-white truncate">
+                                                      {recording.title}
+                                                  </h3>
+                                                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
+                                                      <span>
+                                                          {formatDate(
+                                                              recording.recordedAt ||
+                                                                  recording.createdAt
+                                                          )}
+                                                      </span>
+                                                      <span>•</span>
+                                                      <span>
+                                                          {formatDuration(
+                                                              recording.durationMs
+                                                          )}
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                              {recording.isFavourited && (
+                                                  <svg
+                                                      className="w-4 h-4 text-brand flex-shrink-0 ml-2"
+                                                      fill="currentColor"
+                                                      viewBox="0 0 24 24"
+                                                  >
+                                                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                                  </svg>
+                                              )}
+                                          </div>
+                                      </button>
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              )}
+          </div>
+
+          {/* Floating Record Button */}
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2">
+              <button
+                  onClick={onNewRecording}
+                  className="w-16 h-16 rounded-full bg-brand text-slate-950 hover:bg-orange-400 hover:scale-105 flex items-center justify-center transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95"
+              >
+                  <svg
+                      className="w-8 h-8"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                  >
+                      <circle cx="12" cy="12" r="8" />
+                  </svg>
+              </button>
+          </div>
       </div>
-    </div>
   );
 }
 
