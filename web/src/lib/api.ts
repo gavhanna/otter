@@ -108,6 +108,10 @@ export const api = {
   getStorageUsage: () =>
     request<{ storage: StorageUsage }>('/storage', {
       method: 'GET'
+    }),
+  getHealth: () =>
+    request<HealthStatus>('/health', {
+      method: 'GET'
     })
 };
 
@@ -148,4 +152,9 @@ export type StorageUsage = {
   formattedSize: string;
   usagePercentage: number;
   limitBytes?: number;
+};
+
+export type HealthStatus = {
+  status: string;
+  version?: string;
 };

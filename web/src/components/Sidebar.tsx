@@ -2,6 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/authStore";
+import packageJson from "../../package.json";
+
+const UI_VERSION = packageJson.version ?? "0.0.0";
 
 interface SidebarProps {
     selectedRecordingId: string | null;
@@ -38,12 +41,19 @@ export function Sidebar({
         refetchInterval: 30000, // Refetch every 30 seconds
     });
 
+    const { data: healthData, isLoading: isLoadingHealth } = useQuery({
+        queryKey: ["health"],
+        queryFn: () => api.getHealth(),
+        refetchInterval: 5 * 60 * 1000,
+    });
+
     const recordings = user ? data || [] : [];
     const storageUsage = storageData || {
         formattedSize: "0 B",
         usagePercentage: 0,
         totalFiles: 0,
     };
+    const apiVersion = healthData?.version ?? "0.0.0";
 
     // Filter recordings based on selected tab
     const filteredRecordings = recordings.filter((recording) => {
@@ -239,7 +249,7 @@ export function Sidebar({
                 </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800">
+            <div className="p-4 border-t border-slate-800 space-y-4">
                 <div className="space-y-1">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         Storage
@@ -292,6 +302,13 @@ export function Sidebar({
                         )}
                     </div>
                 </div>
+                <p className="text-xs text-slate-500 text-center">
+                    <span>UI v{UI_VERSION}</span>
+                    <span className="mx-2 text-slate-700">•</span>
+                    <span>
+                        API {isLoadingHealth ? "loading..." : `v${apiVersion}`}
+                    </span>
+                </p>
             </div>
         </aside>
     );
