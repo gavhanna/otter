@@ -98,7 +98,10 @@ export function Sidebar({
     const isMainRecordingsView = currentPath === "/";
 
     return (
-        <aside className="hidden w-80 flex-col border-r border-slate-800 bg-slate-900 lg:flex">
+        <aside
+            className="hidden w-80 flex-col border-r border-slate-800 bg-slate-900 lg:flex"
+            style={{ maxHeight: "100dvh" }}
+        >
             <div className="p-4 border-b border-slate-800">
                 <div className="mb-6 flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-slate-900 font-semibold">
@@ -135,7 +138,7 @@ export function Sidebar({
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="px-4 py-3 border-b border-slate-800">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                         {sidebarTab === "all" && "All Recordings"}
