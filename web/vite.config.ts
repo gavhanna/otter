@@ -1,10 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-vite-plugin";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-
-const rootDir = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
     plugins: [
@@ -14,10 +10,6 @@ export default defineConfig({
         }),
     ],
     resolve: {
-        alias: {
-            react: resolve(rootDir, "node_modules/react"),
-            "react-dom": resolve(rootDir, "node_modules/react-dom"),
-        },
         dedupe: ["react", "react-dom"],
     },
     server: {
