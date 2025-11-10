@@ -45,7 +45,7 @@ export function Sidebar({
         refetchInterval: 5 * 60 * 1000,
     });
 
-    const recordings = user ? recordingsData ?? [] : [];
+    const recordings = user ? (recordingsData ?? []) : [];
     const storageUsage = storageData || {
         formattedSize: "0 B",
         usagePercentage: 0,
@@ -64,20 +64,26 @@ export function Sidebar({
     });
 
     // Group recordings by month
-    const groupedRecordings = filteredRecordings.reduce((groups, recording) => {
-        const date = new Date(recording.recordedAt ?? recording.createdAt);
-        const monthKey = formatMonthKey(date);
+    const groupedRecordings = filteredRecordings.reduce(
+        (groups, recording) => {
+            const date = new Date(recording.recordedAt ?? recording.createdAt);
+            const monthKey = formatMonthKey(date);
 
-        if (!groups[monthKey]) {
-            groups[monthKey] = {
-                monthLabel: formatMonthLabel(date),
-                recordings: []
-            };
-        }
+            if (!groups[monthKey]) {
+                groups[monthKey] = {
+                    monthLabel: formatMonthLabel(date),
+                    recordings: [],
+                };
+            }
 
-        groups[monthKey].recordings.push(recording);
-        return groups;
-    }, {} as Record<string, { monthLabel: string; recordings: typeof recordings }>);
+            groups[monthKey].recordings.push(recording);
+            return groups;
+        },
+        {} as Record<
+            string,
+            { monthLabel: string; recordings: typeof recordings }
+        >
+    );
 
     // Convert to array and sort by month (most recent first)
     const sortedGroups = Object.entries(groupedRecordings)
@@ -93,7 +99,11 @@ export function Sidebar({
                 <div className="mb-6 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-slate-900 font-semibold">
-                            OR
+                            <img
+                                src="/favicon.svg"
+                                alt="Otter Logo"
+                                className="h-6 w-6"
+                            />
                         </div>
                         <div>
                             <div className="text-lg font-semibold">
@@ -372,7 +382,7 @@ function formatDuration(durationMs: number | null | undefined): string {
 
 function formatMonthKey(date: Date): string {
     const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
     return `${year}-${month}`;
 }
 
@@ -380,9 +390,9 @@ function formatMonthLabel(date: Date): string {
     const now = new Date();
     const isCurrentYear = date.getFullYear() === now.getFullYear();
 
-    const month = date.toLocaleDateString('en-US', {
-        month: 'long',
-        year: isCurrentYear ? undefined : 'numeric'
+    const month = date.toLocaleDateString("en-US", {
+        month: "long",
+        year: isCurrentYear ? undefined : "numeric",
     });
 
     return month;

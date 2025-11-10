@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
+  <title>Otter – Minimal Waveform Icon (Coral)</title>
+  <!-- Colors -->
+  <!-- Coral background -->
+  <rect width="512" height="512" fill="#F36E5B"/>
+  <!-- Dark coffee brown foreground -->
+  <g stroke="#2B221C" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Waveform: simple "peaks" style -->
+    <path d="M96 260
+             L176 260
+             L206 200
+             L236 320
+             L276 220
+             L306 260
+             L416 260" />
+  </g>
+  <!-- Whisker dot clusters (three per side) -->
+  <g fill="#2B221C">
+    <!-- Left dots -->
+    <circle cx="72" cy="210" r="10"/>
+    <circle cx="72" cy="260" r="10"/>
+    <circle cx="72" cy="310" r="10"/>
+    <!-- Right dots -->
+    <circle cx="440" cy="210" r="10"/>
+    <circle cx="440" cy="260" r="10"/>
+    <circle cx="440" cy="310" r="10"/>
+  </g>
+</svg>
