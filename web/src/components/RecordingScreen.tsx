@@ -1,15 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import { formatDefaultRecordingName } from "../lib/utils";
-
-type RecorderState = "idle" | "recording" | "paused" | "preview" | "saving";
-
-const SUPPORTS_MEDIA_RECORDER =
-    typeof window !== "undefined" &&
-    typeof navigator !== "undefined" &&
-    "mediaDevices" in navigator &&
-    "MediaRecorder" in window;
+import { useRecorder } from "../hooks/useRecorder";
+import { recordingsQueryKey } from "../hooks/recordings";
 
 interface RecordingScreenProps {
     onRecordingComplete: (recordingId: string) => void;
@@ -25,108 +19,28 @@ export function RecordingScreen({
     onAutoStartConsumed,
 }: RecordingScreenProps) {
     const queryClient = useQueryClient();
-    const [state, setState] = useState<RecorderState>("idle");
-    const [error, setError] = useState<string | null>(null);
-    const [title, setTitle] = useState("");
-    const [durationMs, setDurationMs] = useState<number>(0);
-    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const [visualizerData, setVisualizerData] = useState<Uint8Array | null>(
-        null
-    );
-
-    const recorderRef = useRef<MediaRecorder | null>(null);
-    const streamRef = useRef<MediaStream | null>(null);
-    const startTimeRef = useRef<number>(0);
-    const chunksRef = useRef<Blob[]>([]);
-    const intervalRef = useRef<number | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const analyserRef = useRef<AnalyserNode | null>(null);
-    const dataArrayRef = useRef<Uint8Array | null>(null);
-    const animationRef = useRef<number | null>(null);
-    const recordingStartTimeRef = useRef<number>(0);
-    const pausedTimeRef = useRef<number>(0);
+    const {
+        state,
+        error,
+        setError,
+        title,
+        setTitle,
+        durationMs,
+        audioBlob,
+        audioUrl,
+        visualizerData,
+        startRecording,
+        pauseRecording,
+        resumeRecording,
+        stopRecording,
+        resetRecorder,
+        supportsMediaRecorder,
+    } = useRecorder();
 
     const formattedDuration = useMemo(
         () => formatDuration(durationMs),
         [durationMs]
     );
-
-    useEffect(() => {
-        return () => {
-            cleanupMedia();
-            if (audioUrl) {
-                URL.revokeObjectURL(audioUrl);
-            }
-        };
-    }, [audioUrl]);
-
-    const startRecording = useCallback(async () => {
-        if (!SUPPORTS_MEDIA_RECORDER) {
-            setError("Recording not supported in this browser.");
-            return;
-        }
-        if (state === "recording") {
-            return;
-        }
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-            });
-            const recorder = new MediaRecorder(stream);
-            chunksRef.current = [];
-            recorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    chunksRef.current.push(event.data);
-                }
-            };
-            recorder.onstop = () => {
-                const blob = new Blob(chunksRef.current, {
-                    type: recorder.mimeType || "audio/webm",
-                });
-                setAudioBlob(blob);
-                setAudioUrl((prev) => {
-                    if (prev) URL.revokeObjectURL(prev);
-                    return URL.createObjectURL(blob);
-                });
-
-                // Use the current duration which should be accurate
-                const finalDuration =
-                    Date.now() - recordingStartTimeRef.current;
-                setDurationMs(finalDuration);
-
-                setState("preview");
-                cleanupMedia();
-            };
-
-            recorder.start();
-            recorderRef.current = recorder;
-            streamRef.current = stream;
-            recordingStartTimeRef.current = Date.now();
-            startTimeRef.current = Date.now(); // Keep for backward compatibility
-            pausedTimeRef.current = 0;
-            setError(null);
-            setDurationMs(0);
-            setTitle(formatDefaultRecordingName());
-            setState("recording");
-
-            // Start timer interval
-            intervalRef.current = setInterval(() => {
-                setDurationMs(Date.now() - recordingStartTimeRef.current);
-            }, 100); // Update every 100ms for smooth display
-
-            // Set up audio visualizer
-            setupAudioVisualizer(stream);
-        } catch (err) {
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Unable to access microphone"
-            );
-            cleanupMedia();
-        }
-    }, [state]);
 
     useEffect(() => {
         if (autoStartTrigger && state === "idle") {
@@ -135,73 +49,27 @@ export function RecordingScreen({
         }
     }, [autoStartTrigger, state, startRecording, onAutoStartConsumed]);
 
-    const pauseRecording = () => {
-        if (recorderRef.current && recorderRef.current.state === "recording") {
-            recorderRef.current.pause();
-            pausedTimeRef.current = Date.now();
-            setState("paused");
-
-            // Stop timer interval but keep visualizer running
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-        }
-    };
-
-    const resumeRecording = () => {
-        if (recorderRef.current && recorderRef.current.state === "paused") {
-            recorderRef.current.resume();
-
-            // Account for the pause duration
-            const pauseDuration = Date.now() - pausedTimeRef.current;
-            recordingStartTimeRef.current += pauseDuration;
-            pausedTimeRef.current = 0;
-
-            setState("recording");
-
-            // Restart timer interval - track actual recording time
-            intervalRef.current = setInterval(() => {
-                setDurationMs(Date.now() - recordingStartTimeRef.current);
-            }, 100);
-        }
-    };
-
-    const stopRecording = () => {
-        if (
-            recorderRef.current &&
-            (recorderRef.current.state === "recording" ||
-                recorderRef.current.state === "paused")
-        ) {
-            recorderRef.current.stop();
-            setState("preview");
-
-            // Clear the timer interval
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-                intervalRef.current = null;
-            }
-        }
-    };
-
-    const resetRecorder = () => {
-        setState("idle");
-        setError(null);
-        setTitle("");
-        setDurationMs(0);
-        setAudioBlob(null);
-        setAudioUrl((prev) => {
-            if (prev) URL.revokeObjectURL(prev);
-            return null;
-        });
-        recordingStartTimeRef.current = 0;
-        pausedTimeRef.current = 0;
-        cleanupMedia();
-    };
+    const saveRecordingMutation = useMutation({
+        mutationFn: async (formData: FormData) => api.createRecording(formData),
+        onSuccess: async (response) => {
+            await queryClient.invalidateQueries({
+                queryKey: recordingsQueryKey,
+            });
+            onRecordingComplete(response.recording.id);
+            resetRecorder();
+            onClose?.();
+        },
+        onError: (err: unknown) => {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to upload recording"
+            );
+        },
+    });
 
     const saveRecording = async () => {
         if (!audioBlob) return;
-        setState("saving");
         setError(null);
 
         const recordingTitle = title.trim() || formatDefaultRecordingName();
@@ -215,22 +83,13 @@ export function RecordingScreen({
         formData.append("audio", audioBlob, `recording-${Date.now()}.webm`);
 
         try {
-            const response = await api.createRecording(formData);
-            await queryClient.invalidateQueries({ queryKey: ["recordings"] });
-            onRecordingComplete(response.recording.id);
-            resetRecorder();
-            onClose?.();
-        } catch (err) {
-            setError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to upload recording"
-            );
-            setState("preview");
+            await saveRecordingMutation.mutateAsync(formData);
+        } catch {
+            // Error handled in onError
         }
     };
 
-    const isSaving = state === "saving";
+    const isSaving = saveRecordingMutation.isPending;
 
     return (
         <div className="flex-1 flex flex-col bg-slate-950">
@@ -515,7 +374,7 @@ export function RecordingScreen({
                             )}
 
                             {/* Loading Screen */}
-                            {state === "saving" && (
+                            {isSaving && (
                                 <div className="max-w-md mx-auto text-center">
                                     <div className="flex flex-col items-center space-y-4">
                                         <div className="w-12 h-12 border-4 border-slate-600 border-t-brand rounded-full animate-spin"></div>
@@ -542,7 +401,7 @@ export function RecordingScreen({
                     )}
 
                     {/* Browser Support Notice */}
-                    {!SUPPORTS_MEDIA_RECORDER && (
+                    {!supportsMediaRecorder && (
                         <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-6 py-4 text-sm text-amber-200">
                             Recording requires a modern browser with
                             MediaRecorder support.
@@ -553,58 +412,6 @@ export function RecordingScreen({
         </div>
     );
 
-    function setupAudioVisualizer(stream: MediaStream) {
-        try {
-            audioContextRef.current = new (window.AudioContext ||
-                (window as any).webkitAudioContext)();
-            analyserRef.current = audioContextRef.current.createAnalyser();
-            analyserRef.current.fftSize = 256;
-
-            const source =
-                audioContextRef.current.createMediaStreamSource(stream);
-            source.connect(analyserRef.current);
-
-            const bufferLength = analyserRef.current.frequencyBinCount;
-            dataArrayRef.current = new Uint8Array(bufferLength);
-
-            visualize();
-        } catch (error) {
-            console.warn("Audio visualizer setup failed:", error);
-        }
-    }
-
-    function visualize() {
-        if (!analyserRef.current || !dataArrayRef.current) return;
-
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
-        setVisualizerData(new Uint8Array(dataArrayRef.current));
-
-        animationRef.current = requestAnimationFrame(visualize);
-    }
-
-    function cleanupMedia() {
-        if (recorderRef.current && recorderRef.current.state !== "inactive") {
-            recorderRef.current.stop();
-        }
-        recorderRef.current = null;
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach((track) => track.stop());
-            streamRef.current = null;
-        }
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-        if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-            animationRef.current = null;
-        }
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
-        setVisualizerData(null);
-    }
 }
 
 function formatDuration(durationMs: number): string {

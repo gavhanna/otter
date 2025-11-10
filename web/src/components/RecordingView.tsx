@@ -1,7 +1,14 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import WaveSurfer from "wavesurfer.js";
 import { api } from "../lib/api";
+import {
+    useRecordingQuery,
+    patchRecordingInCaches,
+    removeRecordingFromCaches,
+    recordingQueryKey,
+    recordingsQueryKey,
+} from "../hooks/recordings";
 
 interface RecordingViewProps {
     recordingId: string | null;
@@ -34,15 +41,7 @@ export function RecordingView({
         data: recording,
         isLoading,
         error,
-    } = useQuery({
-        queryKey: ["recording", recordingId],
-        queryFn: async () => {
-            if (!recordingId) return null;
-            const response = await api.getRecording(recordingId);
-            return response.recording;
-        },
-        enabled: !!recordingId,
-    });
+    } = useRecordingQuery(recordingId);
 
     const audioSrc =
         recording && recordingId && recording.id
@@ -65,65 +64,24 @@ export function RecordingView({
         }
 
         const newFavouriteStatus = !recording.isFavourited;
-
-        // Create a stable copy to avoid triggering WaveSurfer re-initialization
         const originalRecording = { ...recording };
 
-        // Optimistic update - update UI immediately
-        queryClient.setQueryData(["recording", recordingId], (oldData: any) => {
-            if (!oldData?.recording) return oldData;
-            return {
-                ...oldData,
-                recording: {
-                    ...oldData.recording,
-                    isFavourited: newFavouriteStatus,
-                },
-            };
-        });
-
-        // Update the recording in the list cache
-        queryClient.setQueryData(["recordings"], (oldData: any) => {
-            if (!oldData?.recordings) return oldData;
-            return {
-                ...oldData,
-                recordings: oldData.recordings.map((r: any) =>
-                    r.id === recording.id
-                        ? { ...r, isFavourited: newFavouriteStatus }
-                        : r
-                ),
-            };
-        });
+        patchRecordingInCaches(queryClient, recording.id, (current) => ({
+            ...current,
+            isFavourited: newFavouriteStatus,
+        }));
 
         try {
             await api.updateFavourite(recording.id, newFavouriteStatus);
 
             // Invalidate queries to ensure both sidebar and recording view update
-            queryClient.invalidateQueries({ queryKey: ["recordings"] });
+            queryClient.invalidateQueries({ queryKey: recordingsQueryKey });
             queryClient.invalidateQueries({
-                queryKey: ["recording", recordingId],
+                queryKey: recordingQueryKey(recording.id),
             });
         } catch (error) {
             console.error("Failed to update favourite status:", error);
-            // Revert on error
-            queryClient.setQueryData(
-                ["recording", recordingId],
-                (oldData: any) => {
-                    if (!oldData?.recording) return oldData;
-                    return {
-                        ...oldData,
-                        recording: originalRecording,
-                    };
-                }
-            );
-            queryClient.setQueryData(["recordings"], (oldData: any) => {
-                if (!oldData?.recordings) return oldData;
-                return {
-                    ...oldData,
-                    recordings: oldData.recordings.map((r: any) =>
-                        r.id === recording.id ? originalRecording : r
-                    ),
-                };
-            });
+            patchRecordingInCaches(queryClient, recording.id, () => originalRecording);
         }
     };
 
@@ -146,22 +104,8 @@ export function RecordingView({
         try {
             await api.deleteRecording(recording.id);
 
-            // Remove recording from cache
-            queryClient.removeQueries({ queryKey: ["recording", recordingId] });
-
-            // Update recordings list cache
-            queryClient.setQueryData(["recordings"], (oldData: any) => {
-                if (!oldData?.recordings) return oldData;
-                return {
-                    ...oldData,
-                    recordings: oldData.recordings.filter(
-                        (r: any) => r.id !== recording.id
-                    ),
-                };
-            });
-
-            // Invalidate queries to ensure UI components are updated
-            queryClient.invalidateQueries({ queryKey: ["recordings"] });
+            removeRecordingFromCaches(queryClient, recording.id);
+            queryClient.invalidateQueries({ queryKey: recordingsQueryKey });
 
             // Notify parent component
             onRecordingDeleted?.();
@@ -266,38 +210,13 @@ export function RecordingView({
 
         setIsUpdating(true);
 
-        // Create a stable copy to avoid triggering unnecessary re-renders
         const originalRecording = { ...recording };
 
-        // Optimistic update
-        queryClient.setQueryData(["recording", recordingId], (oldData: any) => {
-            if (!oldData?.recording) return oldData;
-            return {
-                ...oldData,
-                recording: {
-                    ...oldData.recording,
-                    location: trimmedLocation || null,
-                    locationSource: trimmedLocation ? "manual" : null,
-                },
-            };
-        });
-
-        // Update the recording in the list cache
-        queryClient.setQueryData(["recordings"], (oldData: any) => {
-            if (!oldData?.recordings) return oldData;
-            return {
-                ...oldData,
-                recordings: oldData.recordings.map((r: any) =>
-                    r.id === recording.id
-                        ? {
-                              ...r,
-                              location: trimmedLocation || null,
-                              locationSource: trimmedLocation ? "manual" : null,
-                          }
-                        : r
-                ),
-            };
-        });
+        patchRecordingInCaches(queryClient, recording.id, (current) => ({
+            ...current,
+            location: trimmedLocation || null,
+            locationSource: trimmedLocation ? "manual" : null,
+        }));
 
         try {
             await api.updateRecording(recording.id, {
@@ -314,28 +233,11 @@ export function RecordingView({
         } catch (error) {
             console.error("Failed to update recording location:", error);
 
-            // Revert on error
-            queryClient.setQueryData(
-                ["recording", recordingId],
-                (oldData: any) => {
-                    if (!oldData?.recording) return oldData;
-                    return {
-                        ...oldData,
-                        recording: originalRecording,
-                    };
-                }
+            patchRecordingInCaches(
+                queryClient,
+                recording.id,
+                () => originalRecording
             );
-
-            queryClient.setQueryData(["recordings"], (oldData: any) => {
-                if (!oldData?.recordings) return oldData;
-                return {
-                    ...oldData,
-                    recordings: oldData.recordings.map((r: any) =>
-                        r.id === recording.id ? originalRecording : r
-                    ),
-                };
-            });
-
             setEditLocation(recording.location || ""); // Reset input
         } finally {
             setIsUpdating(false);

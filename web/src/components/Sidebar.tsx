@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/authStore";
 import packageJson from "../../package.json";
+import { useRecordingsQuery } from "../hooks/recordings";
 
 const UI_VERSION = packageJson.version ?? "0.0.0";
 
@@ -22,14 +23,11 @@ export function Sidebar({
     const { user, status } = useAuth();
     const [sidebarTab, setSidebarTab] = useState<"all" | "favourites">("all");
 
-    const { data, isLoading, error } = useQuery({
-        queryKey: ["recordings"],
-        queryFn: async () => {
-            const response = await api.listRecordings();
-            return response.recordings;
-        },
-        enabled: status === "authenticated",
-    });
+    const {
+        data: recordingsData,
+        isLoading: isLoadingRecordings,
+        error: recordingsError,
+    } = useRecordingsQuery(status === "authenticated");
 
     const { data: storageData, isLoading: isLoadingStorage } = useQuery({
         queryKey: ["storage"],
@@ -47,7 +45,7 @@ export function Sidebar({
         refetchInterval: 5 * 60 * 1000,
     });
 
-    const recordings = user ? data || [] : [];
+    const recordings = user ? recordingsData ?? [] : [];
     const storageUsage = storageData || {
         formattedSize: "0 B",
         usagePercentage: 0,
@@ -57,15 +55,6 @@ export function Sidebar({
 
     // Filter recordings based on selected tab
     const filteredRecordings = recordings.filter((recording) => {
-        // Debug logging for favourites
-        if (sidebarTab === "favourites") {
-            console.log(
-                "Recording favourite status:",
-                recording.title,
-                recording.isFavourited
-            );
-        }
-
         switch (sidebarTab) {
             case "favourites":
                 return recording.isFavourited === true;
@@ -177,13 +166,13 @@ export function Sidebar({
                 </div>
 
                 <div className="px-4 py-3 space-y-2">
-                    {error ? (
+                    {recordingsError ? (
                         <div className="rounded-xl border border-rose-500 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
                             Failed to load recordings.
                         </div>
                     ) : null}
 
-                    {isLoading ? (
+                    {isLoadingRecordings ? (
                         <div className="space-y-2">
                             <SkeletonRow />
                             <SkeletonRow />

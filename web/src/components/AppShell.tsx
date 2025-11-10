@@ -3,10 +3,9 @@ import {
     createContext,
     useCallback,
     useContext,
-    useMemo,
     useState,
 } from "react";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useMatch, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "../lib/authStore";
 import { Sidebar } from "./Sidebar";
 
@@ -33,20 +32,18 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
     const { user, logout } = useAuth();
-    const location = useLocation();
     const navigate = useNavigate();
     const [isSidebarOpenMobile, setSidebarOpenMobile] = useState(true);
+    const recordingMatch = useMatch({
+        from: "/_app/recording/$recordingId",
+        shouldThrow: false,
+    });
 
     const openSidebar = useCallback(() => setSidebarOpenMobile(true), []);
     const closeSidebar = useCallback(() => setSidebarOpenMobile(false), []);
 
-    const selectedRecordingId = useMemo(() => {
-        if (location.pathname.startsWith("/recording/")) {
-            const [, , id] = location.pathname.split("/");
-            return id ? decodeURIComponent(id) : null;
-        }
-        return null;
-    }, [location.pathname]);
+    const selectedRecordingId =
+        recordingMatch?.params?.recordingId ?? null;
 
     const handleRecordingSelect = (recordingId: string) => {
         void navigate({
