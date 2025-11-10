@@ -9,6 +9,9 @@ export default defineConfig({
       routesDirectory: './src/routes'
     })
   ],
+  resolve: {
+    dedupe: ['react', 'react-dom']
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',
