@@ -12,8 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as AppRecentRouteImport } from './routes/_app/recent'
-import { Route as AppFavouritesRouteImport } from './routes/_app/favourites'
 import { Route as AppRecordingRecordingIdRouteImport } from './routes/_app/recording.$recordingId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -30,16 +28,6 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppRecentRoute = AppRecentRouteImport.update({
-  id: '/recent',
-  path: '/recent',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFavouritesRoute = AppFavouritesRouteImport.update({
-  id: '/favourites',
-  path: '/favourites',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppRecordingRecordingIdRoute = AppRecordingRecordingIdRouteImport.update({
   id: '/recording/$recordingId',
   path: '/recording/$recordingId',
@@ -48,15 +36,11 @@ const AppRecordingRecordingIdRoute = AppRecordingRecordingIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
-  '/favourites': typeof AppFavouritesRoute
-  '/recent': typeof AppRecentRoute
   '/': typeof AppIndexRoute
   '/recording/$recordingId': typeof AppRecordingRecordingIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
-  '/favourites': typeof AppFavouritesRoute
-  '/recent': typeof AppRecentRoute
   '/': typeof AppIndexRoute
   '/recording/$recordingId': typeof AppRecordingRecordingIdRoute
 }
@@ -64,27 +48,18 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/_app/favourites': typeof AppFavouritesRoute
-  '/_app/recent': typeof AppRecentRoute
   '/_app/': typeof AppIndexRoute
   '/_app/recording/$recordingId': typeof AppRecordingRecordingIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/login'
-    | '/favourites'
-    | '/recent'
-    | '/'
-    | '/recording/$recordingId'
+  fullPaths: '/login' | '/' | '/recording/$recordingId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/favourites' | '/recent' | '/' | '/recording/$recordingId'
+  to: '/login' | '/' | '/recording/$recordingId'
   id:
     | '__root__'
     | '/_app'
     | '/login'
-    | '/_app/favourites'
-    | '/_app/recent'
     | '/_app/'
     | '/_app/recording/$recordingId'
   fileRoutesById: FileRoutesById
@@ -117,20 +92,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/recent': {
-      id: '/_app/recent'
-      path: '/recent'
-      fullPath: '/recent'
-      preLoaderRoute: typeof AppRecentRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/favourites': {
-      id: '/_app/favourites'
-      path: '/favourites'
-      fullPath: '/favourites'
-      preLoaderRoute: typeof AppFavouritesRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/recording/$recordingId': {
       id: '/_app/recording/$recordingId'
       path: '/recording/$recordingId'
@@ -142,15 +103,11 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
-  AppFavouritesRoute: typeof AppFavouritesRoute
-  AppRecentRoute: typeof AppRecentRoute
   AppIndexRoute: typeof AppIndexRoute
   AppRecordingRecordingIdRoute: typeof AppRecordingRecordingIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppFavouritesRoute: AppFavouritesRoute,
-  AppRecentRoute: AppRecentRoute,
   AppIndexRoute: AppIndexRoute,
   AppRecordingRecordingIdRoute: AppRecordingRecordingIdRoute,
 }
