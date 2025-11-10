@@ -1,9 +1,10 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import { type FastifyInstance } from "fastify";
-import type { MultipartFile } from "@fastify/multipart";
-import { Readable } from "node:stream";
+import {
+    type FastifyInstance,
+    type FastifyRequest,
+} from "fastify";
 import {
     createRecordingWithFile,
     deleteRecording,
@@ -14,10 +15,14 @@ import {
     updateRecordingMetadata,
     type CreateRecordingInput,
 } from "../services/recordingService.js";
-
-type ListQuery = {
-    ownerId?: string;
-};
+import { assertAuthenticated } from "../utils/auth.js";
+import { validateRequest } from "../utils/validation.js";
+import {
+    listRecordingsQuerySchema,
+    recordingIdParamSchema,
+    updateFavouriteBodySchema,
+    updateRecordingMetadataBodySchema,
+} from "./schemas/recordings.js";
 
 export async function registerRecordingRoutes(
     app: FastifyInstance
@@ -28,15 +33,18 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
-            const query = request.query as ListQuery | undefined;
+            const queryResult = validateRequest(
+                reply,
+                listRecordingsQuerySchema,
+                request.query ?? {},
+                "query"
+            );
+            if (!queryResult.success) return;
+
             const recordings = await listRecordings(app.db, request.authUser, {
-                ownerId: query?.ownerId,
+                ownerId: queryResult.data.ownerId,
             });
             return { recordings };
         }
@@ -48,11 +56,7 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
             if (!request.isMultipart()) {
                 return reply
@@ -60,150 +64,28 @@ export async function registerRecordingRoutes(
                     .send({ message: "Multipart form data required" });
             }
 
-            const fields: Record<string, string> = {};
-            let audioPart: MultipartFile | null = null;
-            let audioBuffer: Buffer | null = null;
-
-            console.log("Starting multipart processing...");
-            const partsStart = Date.now();
-            let partCount = 0;
-
-            try {
-                for await (const part of request.parts()) {
-                    partCount++;
-                    console.log(`Processing part ${partCount}: type=${part.type}, fieldname=${part.fieldname}`);
-
-                    if (part.type === "file") {
-                        if (part.fieldname === "audio" && !audioPart) {
-                            audioPart = part;
-                            console.log(`Found audio file: ${part.filename}`);
-                            // We need to consume the stream to allow multipart processing to continue
-                            // Buffer the chunks to pass to the recording service
-                            const chunks: Buffer[] = [];
-                            let totalSize = 0;
-                            const maxFileSize = 100 * 1024 * 1024; // 100MB limit
-
-                            for await (const chunk of part.file) {
-                                totalSize += chunk.length;
-                                if (totalSize > maxFileSize) {
-                                    throw new Error(`File too large: ${totalSize} bytes (max: ${maxFileSize})`);
-                                }
-                                chunks.push(chunk);
-                            }
-
-                            // Concatenate all chunks into a single buffer
-                            audioBuffer = Buffer.concat(chunks);
-                            console.log(`Audio file buffered: ${totalSize} bytes`);
-                        } else {
-                            console.log(`Skipping file part: ${part.fieldname}`);
-                            // Consume other files to prevent hanging
-                            for await (const chunk of part.file) {
-                                // Just consume the chunk
-                            }
-                        }
-                    } else if (part.type === "field") {
-                        const value = typeof part.value === "string" ? part.value : String(part.value);
-                        fields[part.fieldname] = value;
-                        console.log(`Field ${part.fieldname}: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
-                    }
-                }
-            } catch (error) {
-                console.error("Error in multipart processing loop:", error);
-                throw error;
-            }
-
-            const partsDuration = Date.now() - partsStart;
-            console.log(`Multipart processing completed in ${partsDuration}ms, processed ${partCount} parts`);
-
-            const title = fields.title?.trim() ?? "";
-            // Title is no longer required as we'll generate a default one on the server side
-
-            if (!audioPart || !audioBuffer) {
+            const upload = await collectRecordingUpload(request);
+            if (!upload.audio) {
                 return reply
                     .status(400)
                     .send({ message: "Audio file is required" });
             }
 
-            const durationParsed = fields.durationMs
-                ? Number(fields.durationMs)
-                : undefined;
-            const durationMs =
-                durationParsed !== undefined && Number.isFinite(durationParsed)
-                    ? durationParsed
-                    : undefined;
-
-            const description =
-                fields.description && fields.description.trim().length > 0
-                    ? fields.description.trim()
-                    : null;
-            const recordedAt =
-                fields.recordedAt && fields.recordedAt.length > 0
-                    ? fields.recordedAt
-                    : null;
-
-            // Extract location fields from form data
-            const location =
-                fields.location && fields.location.trim().length > 0
-                    ? fields.location.trim()
-                    : null;
-            const locationLatitude = fields.locationLatitude
-                ? Number(fields.locationLatitude)
-                : undefined;
-            const locationLongitude = fields.locationLongitude
-                ? Number(fields.locationLongitude)
-                : undefined;
-            const locationSource = fields.locationSource as 'ip' | 'manual' | 'geolocation' | undefined;
-
-            // Get client IP for automatic location detection
-            const clientIp = request.headers['x-forwarded-for'] as string ||
-                request.headers['x-real-ip'] as string ||
-                request.ip ||
-                undefined;
-            
-            console.log({
-                title,
-                description,
-                durationMs,
-                recordedAt,
-                location,
-                locationLatitude,
-                locationLongitude,
-                locationSource,
-                clientIp,
-            });
+            const recordingInput = buildRecordingInput(upload.fields);
+            const clientIp = getClientIp(request);
 
             try {
-                console.log("Starting createRecordingWithFile call...");
-                const startTime = Date.now();
-
                 const recording = await createRecordingWithFile(
                     app.db,
                     request.authUser,
                     app.config.storageDir,
-                    {
-                        title,
-                        description,
-                        durationMs,
-                        recordedAt,
-                        location,
-                        locationLatitude,
-                        locationLongitude,
-                        locationSource,
-                    },
-                    {
-                        filename: audioPart.filename,
-                        mimetype: audioPart.mimetype,
-                        buffer: audioBuffer
-                    },
+                    recordingInput,
+                    upload.audio,
                     clientIp
                 );
 
-                const duration = Date.now() - startTime;
-                console.log(`createRecordingWithFile completed in ${duration}ms`);
-
                 return reply.status(201).send({ recording });
             } catch (error) {
-                console.error("Failed to create recording:", error);
                 request.log.error(error, "Failed to create recording");
                 return reply
                     .status(500)
@@ -218,18 +100,16 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
-            const { id } = request.params as { id: string };
-            if (!id) {
-                return reply
-                    .status(400)
-                    .send({ message: "Recording id is required" });
-            }
+            const paramsResult = validateRequest(
+                reply,
+                recordingIdParamSchema,
+                request.params,
+                "params"
+            );
+            if (!paramsResult.success) return;
+            const { id } = paramsResult.data;
 
             const recording = await getRecordingForViewer(
                 app.db,
@@ -252,27 +132,30 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
-            const { id } = request.params as { id: string };
-            if (!id) {
-                return reply
-                    .status(400)
-                    .send({ message: "Recording id is required" });
-            }
+            const paramsResult = validateRequest(
+                reply,
+                recordingIdParamSchema,
+                request.params,
+                "params"
+            );
+            if (!paramsResult.success) return;
 
-            const body = request.body as { isFavourited?: boolean } | undefined;
-            const isFavourited = Boolean(body?.isFavourited);
+            const bodyResult = validateRequest(
+                reply,
+                updateFavouriteBodySchema,
+                request.body ?? {},
+                "body"
+            );
+            if (!bodyResult.success) return;
+            const { isFavourited } = bodyResult.data;
 
             try {
                 const updated = await updateRecordingFavourite(
                     app.db,
                     request.authUser,
-                    id,
+                    paramsResult.data.id,
                     isFavourited
                 );
 
@@ -298,75 +181,30 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
-            const { id } = request.params as { id: string };
-            if (!id) {
-                return reply
-                    .status(400)
-                    .send({ message: "Recording id is required" });
-            }
+            const paramsResult = validateRequest(
+                reply,
+                recordingIdParamSchema,
+                request.params,
+                "params"
+            );
+            if (!paramsResult.success) return;
 
-            const body = request.body as {
-                title?: string;
-                description?: string | null;
-                location?: string | null;
-                locationLatitude?: number | null;
-                locationLongitude?: number | null;
-                locationSource?: 'manual' | 'geolocation' | null;
-            } | undefined;
-
-            if (!body || (
-                body.title === undefined &&
-                body.description === undefined &&
-                body.location === undefined &&
-                body.locationLatitude === undefined &&
-                body.locationLongitude === undefined &&
-                body.locationSource === undefined
-            )) {
-                return reply
-                    .status(400)
-                    .send({ message: "At least one field must be provided for update" });
-            }
-
-            const updates: {
-                title?: string;
-                description?: string | null;
-                location?: string | null;
-                locationLatitude?: number | null;
-                locationLongitude?: number | null;
-                locationSource?: 'manual' | 'geolocation' | null;
-            } = {};
-
-            if (body.title !== undefined) {
-                updates.title = body.title;
-            }
-            if (body.description !== undefined) {
-                updates.description = body.description;
-            }
-            if (body.location !== undefined) {
-                updates.location = body.location;
-            }
-            if (body.locationLatitude !== undefined) {
-                updates.locationLatitude = body.locationLatitude;
-            }
-            if (body.locationLongitude !== undefined) {
-                updates.locationLongitude = body.locationLongitude;
-            }
-            if (body.locationSource !== undefined) {
-                updates.locationSource = body.locationSource;
-            }
+            const bodyResult = validateRequest(
+                reply,
+                updateRecordingMetadataBodySchema,
+                request.body ?? {},
+                "body"
+            );
+            if (!bodyResult.success) return;
 
             try {
                 const updated = await updateRecordingMetadata(
                     app.db,
                     request.authUser,
-                    id,
-                    updates
+                    paramsResult.data.id,
+                    bodyResult.data
                 );
 
                 if (!updated) {
@@ -391,23 +229,20 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
-            const { id } = request.params as { id: string };
-            if (!id) {
-                return reply
-                    .status(400)
-                    .send({ message: "Recording id is required" });
-            }
+            const paramsResult = validateRequest(
+                reply,
+                recordingIdParamSchema,
+                request.params,
+                "params"
+            );
+            if (!paramsResult.success) return;
 
             const asset = await getPrimaryAssetForViewer(
                 app.db,
                 request.authUser,
-                id
+                paramsResult.data.id
             );
             if (!asset) {
                 return reply
@@ -476,24 +311,21 @@ export async function registerRecordingRoutes(
             preHandler: app.authenticate,
         },
         async (request, reply) => {
-            if (!request.authUser) {
-                return reply
-                    .status(401)
-                    .send({ message: "Authentication required" });
-            }
+            assertAuthenticated(request);
 
-            const { id } = request.params as { id: string };
-            if (!id) {
-                return reply
-                    .status(400)
-                    .send({ message: "Recording id is required" });
-            }
+            const paramsResult = validateRequest(
+                reply,
+                recordingIdParamSchema,
+                request.params,
+                "params"
+            );
+            if (!paramsResult.success) return;
 
             try {
                 const deleted = await deleteRecording(
                     app.db,
                     request.authUser,
-                    id,
+                    paramsResult.data.id,
                     app.config.storageDir
                 );
 
@@ -512,4 +344,140 @@ export async function registerRecordingRoutes(
             }
         }
     );
+}
+
+type ParsedUpload = {
+    fields: Record<string, string>;
+    audio?: {
+        filename?: string;
+        mimetype?: string;
+        buffer: Buffer;
+    };
+};
+
+async function collectRecordingUpload(
+    request: FastifyRequest
+): Promise<ParsedUpload> {
+    const fields: Record<string, string> = {};
+    let audioBuffer: Buffer | null = null;
+    let audioMeta: { filename?: string; mimetype?: string } | null = null;
+
+    const start = Date.now();
+    let partCount = 0;
+    const maxFileSize = 100 * 1024 * 1024; // 100MB
+
+    try {
+        for await (const part of request.parts()) {
+            partCount++;
+            if (part.type === "file") {
+                if (part.fieldname === "audio" && !audioBuffer) {
+                    const chunks: Buffer[] = [];
+                    let totalSize = 0;
+
+                    for await (const chunk of part.file) {
+                        totalSize += chunk.length;
+                        if (totalSize > maxFileSize) {
+                            throw new Error(
+                                `File too large: ${totalSize} bytes (max: ${maxFileSize})`
+                            );
+                        }
+                        chunks.push(chunk);
+                    }
+
+                    audioBuffer = Buffer.concat(chunks);
+                    audioMeta = {
+                        filename: part.filename,
+                        mimetype: part.mimetype,
+                    };
+                    request.log.debug(
+                        { sizeBytes: totalSize },
+                        "Buffered audio upload"
+                    );
+                } else {
+                    // Consume other files to prevent hanging
+                    for await (const _chunk of part.file) {
+                        // intentionally discarding
+                    }
+                }
+            } else if (part.type === "field") {
+                const value =
+                    typeof part.value === "string"
+                        ? part.value
+                        : String(part.value);
+                fields[part.fieldname] = value;
+            }
+        }
+    } catch (error) {
+        request.log.error(error, "Error parsing multipart payload");
+        throw error;
+    }
+
+    request.log.debug(
+        { partCount, durationMs: Date.now() - start },
+        "Completed multipart parsing"
+    );
+
+    return {
+        fields,
+        audio: audioBuffer
+            ? {
+                  filename: audioMeta?.filename,
+                  mimetype: audioMeta?.mimetype,
+                  buffer: audioBuffer,
+              }
+            : undefined,
+    };
+}
+
+function buildRecordingInput(fields: Record<string, string>): CreateRecordingInput {
+    return {
+        title: fields.title?.trim() ?? "",
+        description: toNullableString(fields.description),
+        durationMs: toOptionalNumber(fields.durationMs),
+        recordedAt:
+            fields.recordedAt && fields.recordedAt.trim().length > 0
+                ? fields.recordedAt
+                : null,
+        location: toNullableString(fields.location),
+        locationLatitude: toOptionalNumber(fields.locationLatitude) ?? null,
+        locationLongitude: toOptionalNumber(fields.locationLongitude) ?? null,
+        locationSource: toLocationSource(fields.locationSource),
+    };
+}
+
+function toNullableString(value?: string): string | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
+function toOptionalNumber(value?: string): number | undefined {
+    if (!value) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toLocationSource(
+    value?: string
+): "ip" | "manual" | "geolocation" | undefined {
+    if (!value) return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "ip" || normalized === "manual" || normalized === "geolocation") {
+        return normalized;
+    }
+    return undefined;
+}
+
+function getClientIp(request: FastifyRequest): string | undefined {
+    const forwarded = request.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.length > 0) {
+        return forwarded.split(",")[0]?.trim() || request.ip;
+    }
+
+    const realIp = request.headers["x-real-ip"];
+    if (typeof realIp === "string" && realIp.length > 0) {
+        return realIp;
+    }
+
+    return request.ip || undefined;
 }

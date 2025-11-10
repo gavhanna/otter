@@ -4,11 +4,16 @@ import {
   createUser,
   updateUser,
   findUserByEmail,
-  findUserById,
-  type CreateUserInput,
-  type UpdateUserInput
+  findUserById
 } from '../services/userService.js';
 import { getAppSettings, setRegistrationEnabled } from '../services/settingsService.js';
+import { validateRequest } from '../utils/validation.js';
+import {
+  createUserBodySchema,
+  updateSettingsBodySchema,
+  updateUserBodySchema,
+  userIdParamSchema
+} from './schemas/admin.js';
 
 export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
   app.get(
@@ -29,24 +34,9 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       preHandler: app.requireAdmin
     },
     async (request, reply) => {
-      const body = request.body as Partial<CreateUserInput> | undefined;
-      if (!body?.email || !body.password) {
-        return reply.status(400).send({ message: 'Email and password are required' });
-      }
-
-      const email = body.email.trim().toLowerCase();
-      const password = body.password.trim();
-      const displayName = body.displayName?.trim();
-      const role = body.role ?? 'user';
-      const isActive = body.isActive ?? true;
-
-      if (!email.includes('@')) {
-        return reply.status(400).send({ message: 'Invalid email address' });
-      }
-
-      if (password.length < 8) {
-        return reply.status(400).send({ message: 'Password must be at least 8 characters long' });
-      }
+      const validation = validateRequest(reply, createUserBodySchema, request.body);
+      if (!validation.success) return;
+      const { email, password, displayName, role, isActive } = validation.data;
 
       const existing = await findUserByEmail(app.db, email);
       if (existing) {
@@ -71,27 +61,29 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       preHandler: app.requireAdmin
     },
     async (request, reply) => {
-      const { id } = request.params as { id: string };
-      const body = request.body as UpdateUserInput | undefined;
+      const paramsResult = validateRequest(reply, userIdParamSchema, request.params, 'params');
+      if (!paramsResult.success) return;
+      const { id } = paramsResult.data;
 
-      if (!id) {
-        return reply.status(400).send({ message: 'User id is required' });
-      }
+      const bodyResult = validateRequest(
+        reply,
+        updateUserBodySchema,
+        request.body ?? {},
+        'body'
+      );
+      if (!bodyResult.success) return;
+      const { displayName, password, role, isActive } = bodyResult.data;
 
       const targetUser = await findUserById(app.db, id);
       if (!targetUser) {
         return reply.status(404).send({ message: 'User not found' });
       }
 
-      if (body?.password && body.password.length < 8) {
-        return reply.status(400).send({ message: 'Password must be at least 8 characters long' });
-      }
-
       const updated = await updateUser(app.db, id, {
-        displayName: body?.displayName,
-        password: body?.password,
-        role: body?.role,
-        isActive: body?.isActive
+        displayName,
+        password,
+        role,
+        isActive
       });
 
       if (!updated) {
@@ -128,13 +120,10 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
       preHandler: app.requireAdmin
     },
     async (request, reply) => {
-      const body = request.body as { registrationEnabled?: boolean } | undefined;
+      const validation = validateRequest(reply, updateSettingsBodySchema, request.body);
+      if (!validation.success) return;
 
-      if (body?.registrationEnabled === undefined) {
-        return reply.status(400).send({ message: 'registrationEnabled is required' });
-      }
-
-      const settings = await setRegistrationEnabled(app.db, Boolean(body.registrationEnabled));
+      const settings = await setRegistrationEnabled(app.db, validation.data.registrationEnabled);
       return reply.status(200).send({ settings });
     }
   );

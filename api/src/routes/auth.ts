@@ -7,32 +7,14 @@ import {
   findUserWithPassword,
   toPublicUser
 } from '../services/userService.js';
-
-type BootstrapBody = {
-  email?: string;
-  password?: string;
-  displayName?: string;
-};
+import { validateRequest } from '../utils/validation.js';
+import { bootstrapBodySchema, loginBodySchema } from './schemas/auth.js';
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.post('/auth/bootstrap', async (request, reply) => {
-    const body = request.body as BootstrapBody | undefined;
-
-    if (!body?.email || !body?.password) {
-      return reply.status(400).send({ message: 'Email and password are required' });
-    }
-
-    const email = body.email.trim().toLowerCase();
-    const password = body.password.trim();
-    const displayName = body.displayName?.trim() ?? null;
-
-    if (!email.includes('@')) {
-      return reply.status(400).send({ message: 'Invalid email address' });
-    }
-
-    if (password.length < 8) {
-      return reply.status(400).send({ message: 'Password must be at least 8 characters long' });
-    }
+    const validation = validateRequest(reply, bootstrapBodySchema, request.body);
+    if (!validation.success) return;
+    const { email, password, displayName } = validation.data;
 
     const alreadyInitialized = await hasAnyUsers(app.db);
     if (alreadyInitialized) {
@@ -48,7 +30,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       const user = await createInitialAdmin(app.db, {
         email,
         password,
-        displayName: displayName ?? undefined
+        displayName
       });
       await issueSessionCookie(app, reply, { id: user.id, role: user.role });
       request.authUser = user;
@@ -64,14 +46,9 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/auth/login', async (request, reply) => {
-    const body = request.body as BootstrapBody | undefined;
-
-    if (!body?.email || !body?.password) {
-      return reply.status(400).send({ message: 'Email and password are required' });
-    }
-
-    const email = body.email.trim().toLowerCase();
-    const password = body.password.trim();
+    const validation = validateRequest(reply, loginBodySchema, request.body);
+    if (!validation.success) return;
+    const { email, password } = validation.data;
 
     const user = await findUserWithPassword(app.db, email);
     if (!user || !user.isActive) {
