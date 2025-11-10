@@ -77,7 +77,9 @@ export function AppShell({ children }: AppShellProps) {
                     />
                 </div>
 
-                <div className="flex flex-1 flex-col">
+                <div
+                    className={`flex flex-1 flex-col ${isSidebarOpenMobile ? "hidden md:flex" : ""}`}
+                >
                     <header className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-4 py-3 backdrop-blur">
                         <div className="flex items-center gap-3">
                             {!isSidebarOpenMobile && (

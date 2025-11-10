@@ -87,7 +87,7 @@ export function Sidebar({
     return (
         <aside
             className="flex w-full flex-col border-b border-slate-800 bg-slate-900 md:h-screen md:w-80 md:border-b-0 md:border-r"
-            style={{ maxHeight: "100dvh" }}
+            style={{ height: "100dvh" }}
         >
             <div className="p-4 border-b border-slate-800">
                 <div className="mb-6 flex items-center justify-between gap-3">
@@ -196,19 +196,24 @@ export function Sidebar({
                                             key={recording.id}
                                             role="button"
                                             tabIndex={0}
-                                            onClick={() => onRecordingSelect(recording.id)}
+                                            onClick={() =>
+                                                onRecordingSelect(recording.id)
+                                            }
                                             onKeyDown={(event) => {
                                                 if (
                                                     event.key === "Enter" ||
                                                     event.key === " "
                                                 ) {
                                                     event.preventDefault();
-                                                    onRecordingSelect(recording.id);
+                                                    onRecordingSelect(
+                                                        recording.id
+                                                    );
                                                 }
                                             }}
                                             className={[
                                                 "rounded-xl border p-3 transition focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer",
-                                                recording.id === selectedRecordingId
+                                                recording.id ===
+                                                selectedRecordingId
                                                     ? "border-brand bg-brand/10 text-white"
                                                     : "border-slate-800 bg-slate-900/60 hover:border-brand hover:bg-slate-900",
                                             ].join(" ")}
@@ -225,7 +230,7 @@ export function Sidebar({
                                                         </svg>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                                    <h4 className="text-sm font-semibold text-slate-100 truncate">
+                                                        <h4 className="text-sm font-semibold text-slate-100 truncate">
                                                             {recording.title}
                                                         </h4>
                                                         <p className="text-xs text-slate-500 mt-1">
@@ -237,7 +242,9 @@ export function Sidebar({
                                                     </div>
                                                 </div>
                                                 <span className="text-xs text-slate-400 ml-2 flex-shrink-0">
-                                                    {formatDuration(recording.durationMs)}
+                                                    {formatDuration(
+                                                        recording.durationMs
+                                                    )}
                                                 </span>
                                             </div>
                                         </article>
@@ -276,8 +283,8 @@ export function Sidebar({
                                     storageUsage.usagePercentage > 80
                                         ? "bg-rose-500"
                                         : storageUsage.usagePercentage > 60
-                                        ? "bg-amber-500"
-                                        : "bg-brand"
+                                          ? "bg-amber-500"
+                                          : "bg-brand"
                                 }`}
                                 style={{
                                     width: `${Math.min(
