@@ -95,7 +95,7 @@ export function Sidebar({
             className="flex w-full flex-col border-b border-slate-800 bg-slate-900 md:h-screen md:w-80 md:border-b-0 md:border-r"
             style={{ height: "100dvh" }}
         >
-            <div className="p-4 border-b border-slate-800">
+            <div className="relative p-4 border-b border-slate-800">
                 <div className="mb-6 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-slate-900 font-semibold">
@@ -125,8 +125,9 @@ export function Sidebar({
                 </div>
 
                 <button
+                    type="button"
                     onClick={() => onNewRecording({ autoStart: true })}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 mt-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                    className="hidden md:flex w-full items-center gap-3 rounded-lg px-3 py-2 mt-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
                 >
                     <svg
                         className="h-5 w-5"
@@ -145,7 +146,7 @@ export function Sidebar({
                 </button>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto pb-24 md:pb-0">
                 <div className="px-4 py-3 border-b border-slate-800">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                         {sidebarTab === "all" && "All Recordings"}
@@ -266,7 +267,7 @@ export function Sidebar({
                 </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 space-y-4">
+            <div className="p-4 border-t border-slate-800 space-y-4 md:pb-4">
                 <div className="space-y-1">
                     <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         Storage
@@ -327,6 +328,18 @@ export function Sidebar({
                     </span>
                 </p>
             </div>
+
+            <button
+                type="button"
+                onClick={() => onNewRecording({ autoStart: true })}
+                className="md:hidden fixed inset-x-0 bottom-20 z-20 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                aria-label="Start a new recording"
+            >
+                <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-brand shadow-lg shadow-brand/30">
+                    <span className="sr-only">Record</span>
+                    <span className="h-6 w-6 rounded-full bg-slate-900/80" />
+                </span>
+            </button>
         </aside>
     );
 }
