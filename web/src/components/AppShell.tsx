@@ -8,6 +8,7 @@ import {
 import { useMatch } from "@tanstack/react-router";
 import { useAuth } from "../lib/authStore";
 import { Sidebar } from "./Sidebar";
+import { useServiceWorkerUpdate } from "../hooks/useServiceWorkerUpdate";
 
 type MobileSidebarContextType = {
     openSidebar: () => void;
@@ -32,6 +33,7 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
     const { user, logout } = useAuth();
+    const { hasUpdate, updateNow } = useServiceWorkerUpdate();
     const [isSidebarOpenMobile, setSidebarOpenMobile] = useState(true);
     const recordingMatch = useMatch({
         from: "/_app/recording/$recordingId",
@@ -103,6 +105,20 @@ export function AppShell({ children }: AppShellProps) {
                     </main>
                 </div>
             </div>
+            {hasUpdate && (
+                <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 z-50 flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-4 py-3 shadow-2xl shadow-slate-950/60 md:flex-row md:items-center md:gap-4">
+                    <div className="text-sm text-slate-200">
+                        A new version of Otter is available.
+                    </div>
+                    <button
+                        type="button"
+                        onClick={updateNow}
+                        className="inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-brand/90"
+                    >
+                        Update now
+                    </button>
+                </div>
+            )}
         </MobileSidebarContext.Provider>
     );
 }
