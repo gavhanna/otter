@@ -16,10 +16,11 @@ function RecordingDetailRoute() {
             recordingId={params.recordingId}
             onRecordingDeleted={() => {
                 openSidebar();
-                void navigate({ to: "/", search: { autoStart: false } });
+                void navigate({ to: "/", replace: true });
             }}
             onClose={() => {
-                void navigate({ to: "/", search: { autoStart: false } });
+                openSidebar();
+                void navigate({ to: "/", replace: true });
             }}
         />
     );

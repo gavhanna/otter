@@ -334,7 +334,10 @@ export function RecordingScreen({
                                 {state === "preview" && (
                                     <>
                                         <button
-                                            onClick={resetRecorder}
+                                            onClick={() => {
+                                                resetRecorder();
+                                                onClose?.();
+                                            }}
                                             disabled={isSaving}
                                             className="px-6 py-3 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50 transition-colors"
                                         >

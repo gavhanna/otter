@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppRecordRouteImport } from './routes/_app/record'
 import { Route as AppRecordingRecordingIdRouteImport } from './routes/_app/recording.$recordingId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -28,6 +29,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRecordRoute = AppRecordRouteImport.update({
+  id: '/record',
+  path: '/record',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppRecordingRecordingIdRoute = AppRecordingRecordingIdRouteImport.update({
   id: '/recording/$recordingId',
   path: '/recording/$recordingId',
@@ -36,11 +42,13 @@ const AppRecordingRecordingIdRoute = AppRecordingRecordingIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
+  '/record': typeof AppRecordRoute
   '/': typeof AppIndexRoute
   '/recording/$recordingId': typeof AppRecordingRecordingIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/record': typeof AppRecordRoute
   '/': typeof AppIndexRoute
   '/recording/$recordingId': typeof AppRecordingRecordingIdRoute
 }
@@ -48,18 +56,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/record': typeof AppRecordRoute
   '/_app/': typeof AppIndexRoute
   '/_app/recording/$recordingId': typeof AppRecordingRecordingIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/login' | '/' | '/recording/$recordingId'
+  fullPaths: '/login' | '/record' | '/' | '/recording/$recordingId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/' | '/recording/$recordingId'
+  to: '/login' | '/record' | '/' | '/recording/$recordingId'
   id:
     | '__root__'
     | '/_app'
     | '/login'
+    | '/_app/record'
     | '/_app/'
     | '/_app/recording/$recordingId'
   fileRoutesById: FileRoutesById
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/record': {
+      id: '/_app/record'
+      path: '/record'
+      fullPath: '/record'
+      preLoaderRoute: typeof AppRecordRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/recording/$recordingId': {
       id: '/_app/recording/$recordingId'
       path: '/recording/$recordingId'
@@ -103,11 +120,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppRecordRoute: typeof AppRecordRoute
   AppIndexRoute: typeof AppIndexRoute
   AppRecordingRecordingIdRoute: typeof AppRecordingRecordingIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppRecordRoute: AppRecordRoute,
   AppIndexRoute: AppIndexRoute,
   AppRecordingRecordingIdRoute: AppRecordingRecordingIdRoute,
 }

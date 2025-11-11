@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/authStore";
@@ -9,18 +10,15 @@ const UI_VERSION = packageJson.version ?? "0.0.0";
 
 interface SidebarProps {
     selectedRecordingId: string | null;
-    onRecordingSelect: (id: string) => void;
-    onNewRecording: (options?: { autoStart?: boolean }) => void;
     onCloseMobile?: () => void;
 }
 
 export function Sidebar({
     selectedRecordingId,
-    onRecordingSelect,
-    onNewRecording,
     onCloseMobile,
 }: SidebarProps) {
     const { user, status } = useAuth();
+    const navigate = useNavigate();
     const [sidebarTab, setSidebarTab] = useState<"all" | "favourites">("all");
 
     const {
@@ -90,6 +88,19 @@ export function Sidebar({
         .sort(([a], [b]) => b.localeCompare(a))
         .map(([, group]) => group);
 
+    const handleRecordingSelect = (recordingId: string) => {
+        void navigate({
+            to: "/recording/$recordingId",
+            params: { recordingId },
+        });
+        onCloseMobile?.();
+    };
+
+    const handleNewRecording = () => {
+        void navigate({ to: "/record" });
+        onCloseMobile?.();
+    };
+
     return (
         <aside
             className="flex w-full flex-col border-b border-slate-800 bg-slate-900 md:h-screen md:w-80 md:border-b-0 md:border-r"
@@ -126,7 +137,7 @@ export function Sidebar({
 
                 <button
                     type="button"
-                    onClick={() => onNewRecording({ autoStart: true })}
+                    onClick={handleNewRecording}
                     className="hidden md:flex w-full items-center gap-3 rounded-lg px-3 py-2 mt-3 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
                 >
                     <svg
@@ -208,7 +219,9 @@ export function Sidebar({
                                             role="button"
                                             tabIndex={0}
                                             onClick={() =>
-                                                onRecordingSelect(recording.id)
+                                                handleRecordingSelect(
+                                                    recording.id
+                                                )
                                             }
                                             onKeyDown={(event) => {
                                                 if (
@@ -216,7 +229,7 @@ export function Sidebar({
                                                     event.key === " "
                                                 ) {
                                                     event.preventDefault();
-                                                    onRecordingSelect(
+                                                    handleRecordingSelect(
                                                         recording.id
                                                     );
                                                 }
@@ -331,7 +344,7 @@ export function Sidebar({
 
             <button
                 type="button"
-                onClick={() => onNewRecording({ autoStart: true })}
+                onClick={handleNewRecording}
                 className="md:hidden fixed inset-x-0 bottom-20 z-20 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                 aria-label="Start a new recording"
             >

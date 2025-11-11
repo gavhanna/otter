@@ -5,7 +5,7 @@ import {
     useContext,
     useState,
 } from "react";
-import { useMatch, useNavigate } from "@tanstack/react-router";
+import { useMatch } from "@tanstack/react-router";
 import { useAuth } from "../lib/authStore";
 import { Sidebar } from "./Sidebar";
 
@@ -32,7 +32,6 @@ type AppShellProps = {
 
 export function AppShell({ children }: AppShellProps) {
     const { user, logout } = useAuth();
-    const navigate = useNavigate();
     const [isSidebarOpenMobile, setSidebarOpenMobile] = useState(true);
     const recordingMatch = useMatch({
         from: "/_app/recording/$recordingId",
@@ -45,22 +44,6 @@ export function AppShell({ children }: AppShellProps) {
     const selectedRecordingId =
         recordingMatch?.params?.recordingId ?? null;
 
-    const handleRecordingSelect = (recordingId: string) => {
-        void navigate({
-            to: "/recording/$recordingId",
-            params: { recordingId },
-        });
-        closeSidebar();
-    };
-
-    const handleNewRecording = (options?: { autoStart?: boolean }) => {
-        closeSidebar();
-        void navigate({
-            to: "/",
-            search: { autoStart: options?.autoStart ?? false },
-        });
-    };
-
     return (
         <MobileSidebarContext.Provider value={{ openSidebar, closeSidebar }}>
             <div className="grid grid-cols-[1fr] md:grid-cols-[auto_1fr]  min-h-screen bg-slate-950 text-slate-100">
@@ -71,8 +54,6 @@ export function AppShell({ children }: AppShellProps) {
                 >
                     <Sidebar
                         selectedRecordingId={selectedRecordingId}
-                        onRecordingSelect={handleRecordingSelect}
-                        onNewRecording={handleNewRecording}
                         onCloseMobile={closeSidebar}
                     />
                 </div>
