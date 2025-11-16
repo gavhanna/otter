@@ -1,0 +1,97 @@
+// Prisma schema generated from docs/PROJECT_PLAN.md to match the MVP data model.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  user
+}
+
+enum LocationSource {
+  ip
+  manual
+  geolocation
+}
+
+model User {
+  id           String      @id @default(dbgenerated("lower(hex(randomblob(16)))")) @db.Text
+  email        String      @unique @db.Text
+  displayName  String?     @map("display_name") @db.Text
+  role         UserRole    @default(user) @db.Text
+  passwordHash String      @map("password_hash") @db.Text
+  isActive     Boolean     @map("is_active") @default(true)
+  createdAt    Int         @map("created_at") @default(dbgenerated("(unixepoch())"))
+  updatedAt    Int         @map("updated_at") @default(dbgenerated("(unixepoch())"))
+
+  recordings   Recording[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Recording {
+  id                String          @id @default(dbgenerated("lower(hex(randomblob(16)))")) @db.Text
+  ownerId           String          @map("owner_id") @db.Text
+  title             String          @db.Text
+  description       String?         @db.Text
+  durationMs        Int?            @map("duration_ms") @default(0)
+  recordedAt        Int?            @map("recorded_at") @default(dbgenerated("(unixepoch())"))
+  isFavourited      Boolean         @map("is_favourited") @default(false)
+  transcriptStatus  String?         @map("transcript_status") @db.Text
+  location          String?         @db.Text
+  locationLatitude  String?         @map("location_latitude") @db.Text
+  locationLongitude String?         @map("location_longitude") @db.Text
+  locationSource    LocationSource? @map("location_source") @db.Text
+  createdAt         Int             @map("created_at") @default(dbgenerated("(unixepoch())"))
+  updatedAt         Int             @map("updated_at") @default(dbgenerated("(unixepoch())"))
+
+  owner             User            @relation(fields: [ownerId], references: [id])
+  assets            RecordingAsset[]
+
+  @@index([ownerId], map: "idx_recordings_owner")
+  @@map("recordings")
+}
+
+model RecordingAsset {
+  id          String     @id @default(dbgenerated("lower(hex(randomblob(16)))")) @db.Text
+  recordingId String     @map("recording_id") @db.Text
+  storagePath String     @map("storage_path") @db.Text
+  contentType String     @map("content_type") @db.Text
+  sizeBytes   Int        @map("size_bytes")
+  checksum    String?    @db.Text
+  createdAt   Int        @map("created_at") @default(dbgenerated("(unixepoch())"))
+
+  recording   Recording  @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@index([recordingId], map: "idx_recording_assets_recording")
+  @@map("recording_assets")
+}
+
+model Setting {
+  id                   Int     @id @default(autoincrement())
+  registrationEnabled  Boolean @map("registration_enabled") @default(false)
+  createdAt            Int     @map("created_at") @default(dbgenerated("(unixepoch())"))
+  updatedAt            Int     @map("updated_at") @default(dbgenerated("(unixepoch())"))
+
+  @@map("settings")
+}
+
+model Session {
+  id           String   @id @default(dbgenerated("lower(hex(randomblob(16)))")) @db.Text
+  userId       String   @map("user_id") @db.Text
+  sessionToken String   @map("session_token") @db.Text
+  expiresAt    Int      @map("expires_at")
+  createdAt    Int      @map("created_at") @default(dbgenerated("(unixepoch())"))
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionToken], map: "idx_sessions_token")
+  @@map("sessions")
+}

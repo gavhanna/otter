@@ -51,9 +51,14 @@ export function useRecorder() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
-      const recorder = new MediaRecorder(stream);
+      const processedStream = setupAudioProcessing(stream);
+      const recorder = new MediaRecorder(processedStream ?? stream);
       chunksRef.current = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -92,7 +97,6 @@ export function useRecorder() {
         setDurationMs(Date.now() - recordingStartTimeRef.current);
       }, 100);
 
-      setupAudioVisualizer(stream);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Unable to access microphone'
@@ -156,19 +160,50 @@ export function useRecorder() {
     cleanupMedia();
   }, []);
 
-  function setupAudioVisualizer(stream: MediaStream) {
+  function setupAudioProcessing(stream: MediaStream): MediaStream | null {
+    if (typeof window === 'undefined') return null;
     try {
-      audioContextRef.current = new (window.AudioContext ||
-        (window as any).webkitAudioContext)();
+      const AudioContextCtor =
+        window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextCtor) return null;
+
+      audioContextRef.current = new AudioContextCtor();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+
+      const gainNode = audioContextRef.current.createGain();
+      gainNode.gain.value = 0.9;
+
+      const compressor = audioContextRef.current.createDynamicsCompressor();
+      compressor.threshold.value = -18;
+      compressor.knee.value = 12;
+      compressor.ratio.value = 8;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
-      const bufferLength = analyserRef.current.frequencyBinCount;
-      dataArrayRef.current = new Uint8Array(bufferLength);
+      dataArrayRef.current = new Uint8Array(
+        analyserRef.current.frequencyBinCount
+      );
+
+      const destination = audioContextRef.current.createMediaStreamDestination();
+
+      source.connect(gainNode);
+      gainNode.connect(compressor);
+      compressor.connect(analyserRef.current);
+      analyserRef.current.connect(destination);
+
       visualize();
+      return destination.stream;
     } catch (error) {
-      console.warn('Audio visualizer setup failed:', error);
+      console.warn('Audio processing setup failed:', error);
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      analyserRef.current = null;
+      dataArrayRef.current = null;
+      return null;
     }
   }
 
@@ -176,7 +211,9 @@ export function useRecorder() {
     if (!analyserRef.current || !dataArrayRef.current) return;
     analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
     setVisualizerData(new Uint8Array(dataArrayRef.current));
-    animationRef.current = requestAnimationFrame(visualize);
+    if (typeof window !== 'undefined') {
+      animationRef.current = window.requestAnimationFrame(visualize);
+    }
   }
 
   function cleanupMedia() {
